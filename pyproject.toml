@@ -1,0 +1,82 @@
+[project]
+name = "agent-desk"
+version = "1.0.0"
+description = "Agent Desk: turns controlled websites into verified, discoverable AI agents (GoDaddy ANS + A2A + MCP), then helps other agents discover, verify, and communicate with them."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "a2a-sdk[http-server]",
+    "mcp",
+    "pydantic>=2",
+    "pydantic-settings",
+    "sqlalchemy[asyncio]>=2",
+    "asyncpg",
+    "aiosqlite",
+    "alembic",
+    "redis",
+    "cryptography",
+    "httpx",
+    "beautifulsoup4",
+    "lxml",
+    "jinja2",
+    "argon2-cffi",
+    "python-multipart",
+    "idna",
+    "certifi",
+    "pyjwt[crypto]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "fakeredis",
+    "ruff",
+    "mypy",
+    "pip-audit",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q -ra --strict-markers"
+markers = [
+    "live: requires real network / credentials (deselected by default)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:a2a.*",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "C4", "SIM", "RUF"]
+ignore = [
+    "S101",   # asserts are fine in tests
+    "B008",   # FastAPI Depends() defaults
+    "RUF012", # mutable class attrs in pydantic/sqlalchemy models
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S107", "S108", "S104", "S310", "S603", "S607"]
+"scripts/**" = ["S603", "S607"]
+"deploy/**" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+exclude = ["migrations/", "tests/"]

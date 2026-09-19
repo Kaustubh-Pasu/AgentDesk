@@ -1,0 +1,38 @@
+# --- secrets: never commit ---
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.key.pem
+*-key.pem
+*.p12
+*.pfx
+.gddy/
+.config/gddy/
+
+# --- local state ---
+*.db
+*.sqlite
+*.sqlite3
+var/
+artifacts/*
+!artifacts/.gitkeep
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# --- os / editor ---
+.DS_Store
+.idea/
+.vscode/
