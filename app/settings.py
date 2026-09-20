@@ -19,6 +19,12 @@ Env = Literal["development", "test", "production"]
 ServiceRole = Literal["all", "desk", "runtime", "scraper", "controlplane"]
 LLMProvider = Literal["anthropic", "openai", "gemini", "none"]
 
+#: The PAT/API key is only ever sent to these exact origins (never to a user- or registry-supplied URL).
+GODADDY_API_BASES = {
+    "https://api.godaddy.com": "production",
+    "https://api.ote-godaddy.com": "ote",
+}
+
 _PLACEHOLDER_SECRETS = {
     "",
     "changeme",
@@ -71,6 +77,10 @@ class Settings(BaseSettings):
 
     # --- GoDaddy / ANS (control plane only) -----------------------------------
     godaddy_pat: SecretStr = SecretStr("")
+    # Official sources disagree on ANS auth (docs/research/ANS_API_NOTES.md §3): PAT Bearer vs classic sso-key.
+    ans_auth_scheme: Literal["bearer", "sso-key"] = "bearer"
+    godaddy_api_key: SecretStr = SecretStr("")
+    godaddy_api_secret: SecretStr = SecretStr("")
     godaddy_api_base: str = "https://api.godaddy.com"
     ans_agent_version: str = "1.0.0"
     ans_request_timeout_s: float = 20.0
@@ -131,6 +141,14 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_host(cls, v: str) -> str:
         return v.strip().lower().rstrip(".")
+
+    @field_validator("godaddy_api_base")
+    @classmethod
+    def _api_base(cls, v: str) -> str:
+        v = v.strip().rstrip("/")
+        if v not in GODADDY_API_BASES:
+            raise ValueError("GODADDY_API_BASE must be one of: " + ", ".join(sorted(GODADDY_API_BASES)))
+        return v
 
     @model_validator(mode="after")
     def _derive_and_check(self) -> Settings:
@@ -197,6 +215,16 @@ class Settings(BaseSettings):
             if part:
                 nets.append(ipaddress.ip_network(part, strict=False))
         return nets
+
+    @property
+    def ans_environment(self) -> str:
+        return GODADDY_API_BASES[self.godaddy_api_base]
+
+    @property
+    def ans_credential_configured(self) -> bool:
+        if self.ans_auth_scheme == "bearer":
+            return bool(self.godaddy_pat.get_secret_value())
+        return bool(self.godaddy_api_key.get_secret_value() and self.godaddy_api_secret.get_secret_value())
 
     @property
     def keys_path(self) -> Path:
