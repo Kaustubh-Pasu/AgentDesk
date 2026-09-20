@@ -20,7 +20,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -31,6 +31,7 @@ from app.agents.seed import seed_demo_agent
 from app.ans.certs import KeyStore
 from app.ans.client import AnsClient
 from app.ans.evidence import ProofService
+from app.ans.http01 import read_http01_challenge
 from app.ans.registration import RegistrationFlow, RegistrationService
 from app.ans.verifier import TlsProbe, Verifier
 from app.controlplane.api import LocalRegistrar, Registrar, RemoteRegistrar, controlplane_routes
@@ -268,10 +269,18 @@ def build_app(
         served = await services.registry.resolve(request.query_params.get("domain", ""))
         return JSONResponse({"served": served is not None}, 200 if served is not None else 404)
 
+    async def acme_http01(request: Any) -> PlainTextResponse:
+        """Public ACME HTTP-01 token body. Token charset is restricted; missing token → 404."""
+        body = read_http01_challenge(settings.artifacts_path, request.path_params.get("token", ""))
+        if body is None:
+            return PlainTextResponse("Not found", status_code=404)
+        return PlainTextResponse(body)
+
     app.router.routes.extend(
         [
             Route("/healthz", _healthz),
             Route("/internal/tls-ask", tls_ask),
+            Route("/.well-known/acme-challenge/{token}", acme_http01, methods=["GET"]),
             *create_a2a_routes(services.runtime, settings),
             *services.mcp.routes(),
         ]

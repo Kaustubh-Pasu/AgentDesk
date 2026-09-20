@@ -38,6 +38,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - ../artifacts/acme-http01:/acme-http01:ro
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
@@ -45,7 +46,6 @@ services:
     tmpfs: ["/tmp"]
     pids_limit: 256
     mem_limit: 256m
-    cpus: 1.0
     networks: [edge]
     depends_on:
       desk: { condition: service_healthy }
@@ -66,7 +66,6 @@ services:
     volumes:
       - ../artifacts:/artifacts
     mem_limit: 768m
-    cpus: 1.5
     networks: [edge, data, control, scrape]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/healthz', headers={'Host': 'desk.${BASE_DOMAIN}'}), timeout=3)"]
@@ -86,10 +85,11 @@ services:
       BASE_DOMAIN: ${BASE_DOMAIN}
       GODADDY_API_BASE: ${GODADDY_API_BASE:-https://api.godaddy.com}
       KEYS_DIR: /keys
+      ARTIFACTS_DIR: /artifacts
     volumes:
       - ans_keys:/keys                          # ANS private keys: mounted into THIS service only
+      - ../artifacts:/artifacts                 # redacted registration state/evidence (no secrets)
     mem_limit: 384m
-    cpus: 0.5
     networks: [control, data, egress]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -103,7 +103,6 @@ services:
       SESSION_SECRET: scraper-has-no-sessions-placeholder-0000000000
       CSRF_SECRET: scraper-has-no-csrf-placeholder-11111111111111
     mem_limit: 384m
-    cpus: 0.5
     networks: [scrape, scrape_egress]
 
   migrate:

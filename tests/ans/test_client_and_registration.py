@@ -136,7 +136,68 @@ async def make_flow(db: Database, fake: FakeANS, settings):  # type: ignore[no-u
     return registry, flow
 
 
-async def test_registration_payload_matches_contract(db: Database, fake_ans: FakeANS, ans_settings) -> None:  # type: ignore[no-untyped-def]
+async def test_http01_challenge_files_are_written_but_not_snapshotted(tmp_path, ans_settings) -> None:
+    from app.ans.client import RegistrationPending
+    from app.ans.http01 import publish_http01_challenges, read_http01_challenge
+
+    pending = RegistrationPending.model_validate(
+        {
+            "status": "PENDING_VALIDATION",
+            "agentId": "284ab9b7-6ed4-422c-bfae-66e07932cb28",
+            "challenges": [
+                {
+                    "type": "HTTP_01",
+                    "token": "abcTOKEN",
+                    "keyAuthorization": "abcTOKEN.thumb",
+                    "httpPath": "/.well-known/acme-challenge/abcTOKEN",
+                }
+            ],
+        }
+    )
+    assert publish_http01_challenges(pending, tmp_path) == 1
+    assert read_http01_challenge(tmp_path, "abcTOKEN") == "abcTOKEN.thumb"
+    assert not read_http01_challenge(tmp_path, "../x")
+    assert publish_http01_challenges(pending, tmp_path) == 1  # overwrite ok
+
+
+async def test_register_recovers_agent_id_from_allowlisted_links(ans_settings) -> None:
+    from app.ans.client import RegistrationPending
+
+    pending = RegistrationPending.model_validate(
+        {
+            "status": "PENDING_VALIDATION",
+            "ansName": f"ans://v1.0.0.{DEMO_HOST}",
+            "nextSteps": [
+                {
+                    "action": "CONFIGURE_HTTP",
+                    "description": "Configure web server file for ACME validation",
+                    "endpoint": "https://api.godaddy.com/v1/agents/284ab9b7-6ed4-422c-bfae-66e07932cb28/verify-acme",
+                }
+            ],
+            "challenges": [
+                {
+                    "type": "HTTP_01",
+                    "token": "abcTOKEN",
+                    "keyAuthorization": "abcTOKEN.thumb",
+                    "httpPath": "/.well-known/acme-challenge/abcTOKEN",
+                }
+            ],
+            "links": [
+                {
+                    "rel": "self",
+                    "href": "https://api.godaddy.com/v1/agents/284ab9b7-6ed4-422c-bfae-66e07932cb28",
+                }
+            ],
+        }
+    )
+    assert pending.agent_id == "284ab9b7-6ed4-422c-bfae-66e07932cb28"
+    evil = RegistrationPending.model_validate(
+        {
+            "status": "PENDING_VALIDATION",
+            "links": [{"rel": "self", "href": "https://evil.example/v1/agents/284ab9b7-6ed4-422c-bfae-66e07932cb28"}],
+        }
+    )
+    assert evil.agent_id is None
     registry, _ = await make_flow(db, fake_ans, ans_settings)
     agent = await registry.resolve(DEMO_HOST)
     assert agent is not None

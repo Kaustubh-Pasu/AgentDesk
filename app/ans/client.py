@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from app.logging_config import get_logger
 from app.settings import Settings
@@ -29,6 +29,12 @@ log = get_logger("ans.client")
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _AGENT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]{0,127}\Z")
+# Live register 202 omits top-level agentId; recover it ONLY from allow-listed RA hrefs (never dereference).
+_AGENT_ID_IN_RA_HREF = re.compile(
+    r"^https://api(?:\.ote)?\.godaddy\.com/v1/agents/"
+    r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    r"(?:/.*)?$"
+)
 _RETRY_STATUS = frozenset({429, 502, 503, 504})
 REVOCATION_REASONS = frozenset(
     {
@@ -95,12 +101,20 @@ class Challenge(_Model):
     http_path: str | None = Field(None, alias="httpPath", max_length=300)
     dns_record: DnsRecord | None = Field(None, alias="dnsRecord")
     expires_at: str | None = Field(None, alias="expiresAt", max_length=64)
-    # token / keyAuthorization are deliberately NOT modelled: we never need them for DNS-01 and never store them.
+    # HTTP-01 values are public (served at httpPath). They are never copied into evidence snapshots.
+    token: str = Field("", max_length=128)
+    key_authorization: str | None = Field(None, alias="keyAuthorization", max_length=300)
 
 
 class NextStep(_Model):
     action: str = Field("", max_length=40)
     description: str = Field("", max_length=300)
+    endpoint: str = Field("", max_length=500)
+
+
+class Link(_Model):
+    rel: str = Field("", max_length=64)
+    href: str = Field("", max_length=500)
 
 
 class RegistrationPending(_Model):
@@ -111,10 +125,23 @@ class RegistrationPending(_Model):
     challenge: Challenge | None = None  # the [SPEC] example uses the singular form
     dns_records: list[DnsRecord] = Field(default_factory=list, alias="dnsRecords", max_length=20)
     next_steps: list[NextStep] = Field(default_factory=list, alias="nextSteps", max_length=10)
+    links: list[Link] = Field(default_factory=list, max_length=20)
     expires_at: str | None = Field(None, alias="expiresAt", max_length=64)
 
     def all_challenges(self) -> list[Challenge]:
         return [*self.challenges, *([self.challenge] if self.challenge else [])]
+
+    @model_validator(mode="after")
+    def _agent_id_from_allowlisted_hrefs(self) -> RegistrationPending:
+        """Hosted RA 202 omits agentId; it is present in links/nextSteps on api[.ote].godaddy.com only."""
+        if self.agent_id:
+            return self
+        for href in [*(link.href for link in self.links), *(step.endpoint for step in self.next_steps)]:
+            match = _AGENT_ID_IN_RA_HREF.match(href.strip())
+            if match:
+                self.agent_id = match.group(1)
+                break
+        return self
 
 
 class AgentDetails(_Model):
@@ -127,6 +154,14 @@ class AgentDetails(_Model):
     endpoints: list[AnsEndpoint] = Field(default_factory=list, max_length=10)
     registration_pending: RegistrationPending | None = Field(None, alias="registrationPending")
     dns_records: list[DnsRecord] = Field(default_factory=list, alias="dnsRecords", max_length=20)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _copy_list_status(cls, data: Any) -> Any:
+        # GET /v1/agents list items use "status"; GET /v1/agents/{id} uses "agentStatus".
+        if isinstance(data, dict) and not data.get("agentStatus") and isinstance(data.get("status"), (str, dict)):
+            return {**data, "agentStatus": data["status"]}
+        return data
 
     @field_validator("agent_status", mode="before")
     @classmethod

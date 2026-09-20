@@ -1,6 +1,13 @@
 # Agent Desk — Caddy is the ONLY public ingress (80/443). Validate with:  caddy validate --config deploy/Caddyfile
 {
 	email {$ACME_EMAIL}
+	# Do not auto-308 :80 — ANS HTTP-01 is checked in the clear and does not follow redirects.
+	# Use TLS-ALPN for our own certificates so Caddy does not steal /.well-known/acme-challenge/.
+	auto_https disable_redirects
+	cert_issuer acme {
+		disable_http_challenge
+		email {$ACME_EMAIL}
+	}
 	# Tenant hosts get certificates on demand, but ONLY if the app confirms the host is a served agent.
 	on_demand_tls {
 		ask http://desk:8000/internal/tls-ask
@@ -71,21 +78,25 @@
 	}
 }
 
-# Explicit hosts (Gate 2/3): certificates are obtained at start-up.
-desk.{$BASE_DOMAIN}, demo.{$BASE_DOMAIN} {
-	import agentdesk
-}
-
-# Generated tenant agents: direct children of BASE_DOMAIN only, certificate on demand after the app's "ask" check.
-*.{$BASE_DOMAIN} {
-	tls {
-		on_demand
+# ANS HTTP-01 challenges are public tokens served as exact files (no secrets).
+(acme_http01) {
+	handle_path /.well-known/acme-challenge/* {
+		root * /acme-http01
+		header Content-Type "text/plain"
+		file_server
 	}
-	import agentdesk
 }
 
-# Anything else (bare IP, unknown names) gets nothing.
-:443 {
-	tls internal
-	respond 421
+# Serve the challenge on :80 too: ACME HTTP-01 starts in the clear; everything else 308s to HTTPS.
+http://desk.{$BASE_DOMAIN}, http://demo.{$BASE_DOMAIN} {
+	import acme_http01
+	handle {
+		redir https://{host}{uri} 308
+	}
+}
+
+# Explicit hosts (Gate 2/3): certificates are obtained automatically via Let's Encrypt.
+desk.{$BASE_DOMAIN}, demo.{$BASE_DOMAIN} {
+	import acme_http01
+	import agentdesk
 }

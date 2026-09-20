@@ -34,6 +34,7 @@ def args(**overrides: object) -> argparse.Namespace:
         "gddy_dns": False,
         "zone": "",
         "yes": False,
+        "skip_preflight": False,
         "timeout": 1.0,
     }
     return argparse.Namespace(**{**base, **overrides})
