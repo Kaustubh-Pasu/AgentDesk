@@ -1,1 +1,26 @@
-{% macro badge(status) %}<span class="badge badge-{{ status|lower }}">{{ status }}</span>{% endmacro %}
+{# Status marks: PASS is a solid sealed mark, FAIL a solid "no entry" mark, INCOMPLETE a hollow dashed mark.
+   The text label is always present; shape and colour only reinforce it. #}
+{% macro glyph(status) %}
+{% set s = status|lower %}
+<svg class="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+{% if s == "pass" %}<circle class="g-fill" cx="8" cy="8" r="7.25"/><path class="g-cut" d="M4.6 8.3l2.3 2.3 4.6-5"/>
+{% elif s == "fail" %}<circle class="g-fill" cx="8" cy="8" r="7.25"/><path class="g-cut" d="M4.5 8h7"/>
+{% elif s == "incomplete" %}<circle class="g-dash" cx="8" cy="8" r="6.5"/><circle class="g-fill" cx="8" cy="8" r="1.6"/>
+{% else %}<circle class="g-line" cx="8" cy="8" r="6.5"/>{% endif %}
+</svg>
+{% endmacro %}
+
+{% macro badge(status, size="") %}<span class="badge badge-{{ status|lower }}{% if size %} badge-{{ size }}{% endif %}">{{ glyph(status) }}<span class="badge-label">{{ status|replace("_", " ") }}</span></span>{% endmacro %}
+
+{# The register's margin stepper. `steps` is a list of labels; `current` is 1-based; 0 means none is current;
+   a value above the number of steps means every step is done. #}
+{% macro stepper(steps, current, label) %}
+<ol class="stepper" aria-label="{{ label }}">
+{% for step in steps %}
+  <li class="step{% if loop.index < current %} step-done{% elif loop.index == current %} step-current{% endif %}"{% if loop.index == current %} aria-current="step"{% endif %}>
+    <span class="step-mark" aria-hidden="true">{% if loop.index < current %}<svg viewBox="0 0 16 16" focusable="false"><path d="M4.2 8.4l2.5 2.5 5-5.6"/></svg>{% else %}{{ loop.index }}{% endif %}</span>
+    <span class="step-label">{{ step }}{% if loop.index < current %}<span class="visually-hidden"> (done)</span>{% endif %}</span>
+  </li>
+{% endfor %}
+</ol>
+{% endmacro %}

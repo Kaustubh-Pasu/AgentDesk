@@ -1,29 +1,42 @@
 {% extends "base.html" %}
+{% from "_macros.html" import badge %}
 {% block content %}
 <section class="hero">
-  <h1>Turn a website into a verified, discoverable AI agent.</h1>
-  <p>Agent Desk turns controlled websites into verified, discoverable AI agents, then helps other agents
-     discover, verify, and communicate with them — using the GoDaddy Agent Name Service, A2A and MCP.</p>
+  <h1>Turn a website into an AI agent that anyone can verify.</h1>
+  <p class="lede">Agent Desk publishes a read-only agent for your business, registers it with the GoDaddy Agent Name Service,
+     and shows the live evidence behind every claim.</p>
+  <p class="legend">Every result is one of {{ badge("PASS") }} {{ badge("FAIL") }} {{ badge("INCOMPLETE") }} and nothing is rounded up.</p>
 </section>
-<section class="cards">
-  <a class="card" href="/create">
+
+<section class="paths" aria-label="What you can do">
+  <a class="path" href="/create">
+    <span class="path-mark" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M8 3.5v9M3.5 8h9"/></svg></span>
     <h2>Create agent</h2>
-    <p>Safely import a public website, review the extracted facts, publish a read-only business agent on A2A + MCP,
+    <p>Safely import a public website, review the extracted facts, publish a read-only business agent on A2A and MCP,
        and register it with GoDaddy ANS.</p>
+    <span class="path-go">Start with your website
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span>
   </a>
-  <a class="card" href="/find">
+  <a class="path" href="/find">
+    <span class="path-mark" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="7" cy="7" r="3.75"/><path d="M10 10l3 3"/></svg></span>
     <h2>Find agent</h2>
     <p>Search ANS for a capability, run the 15-point verification checklist on each candidate, then ask the verified
        agent a read-only question.</p>
+    <span class="path-go">Search and verify
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span>
   </a>
 </section>
-<section>
-  <h2>This deployment</h2>
-  <ul class="plain">
-    <li>Agent Desk A2A card: <code>{{ settings_view.desk_origin }}/.well-known/agent-card.json</code> · MCP: <code>{{ settings_view.desk_origin }}/mcp</code></li>
-    <li>Demo business agent: <a href="{{ settings_view.demo_origin }}/">{{ settings_view.demo_host }}</a> ·
-        <a href="{{ settings_view.demo_origin }}/proof">its proof</a></li>
-    <li><a href="/proof">Live five-gate proof for this host</a></li>
-  </ul>
+
+<section aria-labelledby="deployment">
+  <h2 id="deployment">This deployment</h2>
+  <p class="muted">Everything below is checked live. <a href="/proof">Read the five-gate proof for this host</a> or
+     <a href="{{ settings_view.demo_origin }}/proof">for the demo agent</a>.</p>
+  <dl class="endpoints">
+    <dt>desk agent card</dt><dd>{{ settings_view.desk_origin }}/.well-known/agent-card.json</dd>
+    <dt>desk a2a</dt><dd>{{ settings_view.desk_origin }}/a2a</dd>
+    <dt>desk mcp</dt><dd>{{ settings_view.desk_origin }}/mcp</dd>
+    <dt>demo agent</dt><dd><a href="{{ settings_view.demo_origin }}/">{{ settings_view.demo_host }}</a></dd>
+    <dt>demo mcp</dt><dd>{{ settings_view.demo_origin }}/mcp</dd>
+  </dl>
 </section>
 {% endblock %}

@@ -3,31 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}Agent Desk{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="/">Agent Desk</a>
-  <nav>
-    <a href="/create">Create</a>
-    <a href="/find">Find</a>
-    <a href="/proof">Proof</a>
-    <a href="/security">Security</a>
-    {% if principal %}
-    <form method="post" action="/logout" class="inline">
-      <input type="hidden" name="csrf_token" value="{{ principal.session.csrf_token }}">
-      <button class="link" type="submit">Sign out</button>
-    </form>
-    {% else %}<a href="/login">Sign in</a>{% endif %}
-  </nav>
+  <div class="top-inner">
+    <a class="brand" href="/">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.75" y="2.75" width="18.5" height="18.5" rx="4"/><path d="M7.5 12.4l3 3 6-6.8"/></svg>
+      <span>Agent Desk</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="/create">Create</a>
+      <a href="/find">Find</a>
+      <a href="/proof">Proof</a>
+      <a href="/security">Security</a>
+      {% if principal %}
+      <form method="post" action="/logout" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ principal.session.csrf_token }}">
+        <button class="link" type="submit">Sign out</button>
+      </form>
+      {% else %}<a href="/login">Sign in</a>{% endif %}
+    </nav>
+  </div>
 </header>
-<main>
+<main id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
-<footer>
-  <span>discover → verify → communicate</span>
-  <span class="muted">ANS environment: {{ settings_view.environment }} · request {{ correlation_id }}</span>
+<footer class="foot">
+  <div class="foot-inner">
+    <span class="motto">discover → verify → communicate</span>
+    <span class="foot-meta">ANS environment: {{ settings_view.environment }} · request <code>{{ correlation_id }}</code></span>
+  </div>
 </footer>
+{% block scripts %}{% endblock %}
 </body>
 </html>

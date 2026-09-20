@@ -1,0 +1,487 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-20T04:00:21Z",
+  "title": "Design System: Agent Desk",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Registrar's Ink",
+        "canonical": "oklch(39.4% 0.138 264)",
+        "tonalRamp": [
+          "oklch(15% 0.069 264)",
+          "oklch(27% 0.138 264)",
+          "oklch(39% 0.138 264)",
+          "oklch(51% 0.138 264)",
+          "oklch(63% 0.138 264)",
+          "oklch(75% 0.138 264)",
+          "oklch(87% 0.138 264)",
+          "oklch(95% 0.069 264)"
+        ],
+        "darkValue": "#9dbdff"
+      },
+      "ink-hover": {
+        "role": "primary",
+        "displayName": "Ink Pressed",
+        "canonical": "#17306f",
+        "tonalRamp": [
+          "oklch(15% 0.060 264)",
+          "oklch(27% 0.120 264)",
+          "oklch(39% 0.120 264)",
+          "oklch(51% 0.120 264)",
+          "oklch(63% 0.120 264)",
+          "oklch(75% 0.120 264)",
+          "oklch(87% 0.120 264)",
+          "oklch(95% 0.060 264)"
+        ],
+        "darkValue": "#bcd2ff"
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "oklch(97.6% 0.003 265)",
+        "tonalRamp": [
+          "oklch(15% 0.003 265)",
+          "oklch(27% 0.006 265)",
+          "oklch(39% 0.006 265)",
+          "oklch(51% 0.006 265)",
+          "oklch(63% 0.006 265)",
+          "oklch(75% 0.006 265)",
+          "oklch(87% 0.006 265)",
+          "oklch(95% 0.003 265)"
+        ],
+        "darkValue": "#0e1117"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Sheet White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.002 265)",
+          "oklch(27% 0.004 265)",
+          "oklch(39% 0.004 265)",
+          "oklch(51% 0.004 265)",
+          "oklch(63% 0.004 265)",
+          "oklch(75% 0.004 265)",
+          "oklch(87% 0.004 265)",
+          "oklch(95% 0.002 265)"
+        ],
+        "darkValue": "#161a23"
+      },
+      "sunken": {
+        "role": "neutral",
+        "displayName": "Sunken Paper",
+        "canonical": "#eef0f4",
+        "tonalRamp": [
+          "oklch(15% 0.004 265)",
+          "oklch(27% 0.008 265)",
+          "oklch(39% 0.008 265)",
+          "oklch(51% 0.008 265)",
+          "oklch(63% 0.008 265)",
+          "oklch(75% 0.008 265)",
+          "oklch(87% 0.008 265)",
+          "oklch(95% 0.004 265)"
+        ],
+        "darkValue": "#0a0d12"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Blue-Black Text",
+        "canonical": "oklch(20.0% 0.019 266)",
+        "tonalRamp": [
+          "oklch(15% 0.009 266)",
+          "oklch(27% 0.019 266)",
+          "oklch(39% 0.019 266)",
+          "oklch(51% 0.019 266)",
+          "oklch(63% 0.019 266)",
+          "oklch(75% 0.019 266)",
+          "oklch(87% 0.019 266)",
+          "oklch(95% 0.009 266)"
+        ],
+        "darkValue": "#e9ecf2"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Slate Note",
+        "canonical": "oklch(47.6% 0.030 261)",
+        "tonalRamp": [
+          "oklch(15% 0.015 261)",
+          "oklch(27% 0.030 261)",
+          "oklch(39% 0.030 261)",
+          "oklch(51% 0.030 261)",
+          "oklch(63% 0.030 261)",
+          "oklch(75% 0.030 261)",
+          "oklch(87% 0.030 261)",
+          "oklch(95% 0.015 261)"
+        ],
+        "darkValue": "#a3acbb"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(89.9% 0.013 262)",
+        "tonalRamp": [
+          "oklch(15% 0.006 262)",
+          "oklch(27% 0.013 262)",
+          "oklch(39% 0.013 262)",
+          "oklch(51% 0.013 262)",
+          "oklch(63% 0.013 262)",
+          "oklch(75% 0.013 262)",
+          "oklch(87% 0.013 262)",
+          "oklch(95% 0.006 262)"
+        ],
+        "darkValue": "#2a3140"
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "#858fa1",
+        "tonalRamp": [
+          "oklch(15% 0.014 262)",
+          "oklch(27% 0.028 262)",
+          "oklch(39% 0.028 262)",
+          "oklch(51% 0.028 262)",
+          "oklch(63% 0.028 262)",
+          "oklch(75% 0.028 262)",
+          "oklch(87% 0.028 262)",
+          "oklch(95% 0.014 262)"
+        ],
+        "darkValue": "#707a8d"
+      },
+      "pass": {
+        "role": "tertiary",
+        "displayName": "Sealed Green",
+        "canonical": "oklch(45.2% 0.106 153)",
+        "tonalRamp": [
+          "oklch(15% 0.053 153)",
+          "oklch(27% 0.106 153)",
+          "oklch(39% 0.106 153)",
+          "oklch(51% 0.106 153)",
+          "oklch(63% 0.106 153)",
+          "oklch(75% 0.106 153)",
+          "oklch(87% 0.106 153)",
+          "oklch(95% 0.053 153)"
+        ],
+        "darkValue": "#72d998"
+      },
+      "fail": {
+        "role": "tertiary",
+        "displayName": "Struck Red",
+        "canonical": "oklch(46.6% 0.162 28)",
+        "tonalRamp": [
+          "oklch(15% 0.081 28)",
+          "oklch(27% 0.162 28)",
+          "oklch(39% 0.162 28)",
+          "oklch(51% 0.162 28)",
+          "oklch(63% 0.162 28)",
+          "oklch(75% 0.162 28)",
+          "oklch(87% 0.162 28)",
+          "oklch(95% 0.081 28)"
+        ],
+        "darkValue": "#ff9d93"
+      },
+      "inc": {
+        "role": "tertiary",
+        "displayName": "Open Amber",
+        "canonical": "oklch(46.9% 0.097 80)",
+        "tonalRamp": [
+          "oklch(15% 0.049 80)",
+          "oklch(27% 0.097 80)",
+          "oklch(39% 0.097 80)",
+          "oklch(51% 0.097 80)",
+          "oklch(63% 0.097 80)",
+          "oklch(75% 0.097 80)",
+          "oklch(87% 0.097 80)",
+          "oklch(95% 0.049 80)"
+        ],
+        "darkValue": "#f1c45f"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The home promise and a tenant agent's name; held to about 18ch."
+      },
+      "verdict": {
+        "displayName": "Verdict",
+        "purpose": "The uppercase status word in the verdict banner, beside its glyph."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles; 1.75rem below 48rem."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section, stage and candidate headings; the verdict count."
+      },
+      "entry-title": {
+        "displayName": "Entry Title",
+        "purpose": "Heading of an entry inside a register; also the lede size."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running copy at a 65ch measure with tabular numerals."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Secondary copy, tables, fact lists, nav links."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase column heads, margin entry numbers, stacked-table data labels."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "The written status inside a badge; 1.125rem in the large badge."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Machine values only: hostnames, URLs, DNS values, fingerprints, tool ids, reported states."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "150ms",
+        "purpose": "Colour and border transitions on buttons; disclosure chevron turn."
+      },
+      {
+        "name": "path-arrow-ease",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "0.25rem arrow nudge on a home path on hover."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "All transitions and animations collapse under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "small",
+        "value": "max-width: 47.99rem",
+        "purpose": "Margin column folds above the entry, stepper goes vertical, stackable tables become labelled blocks, paths and verdict stack."
+      }
+    ],
+    "themes": {
+      "mechanism": "prefers-color-scheme",
+      "note": "Every colour custom property is defined in :root and redefined in the dark media block. Frontmatter -dark keys hold the dark values; colorMeta.darkValue repeats them per role."
+    },
+    "cssCustomProperties": {
+      "ink": "--accent",
+      "ink-hover": "--accent-hover",
+      "on-ink": "--on-accent",
+      "ground": "--bg",
+      "surface": "--surface",
+      "sunken": "--sunken",
+      "text": "--fg",
+      "muted": "--muted",
+      "rule": "--line",
+      "rule-strong": "--line-strong",
+      "pass": "--pass",
+      "pass-bg": "--pass-bg",
+      "fail": "--fail",
+      "fail-bg": "--fail-bg",
+      "on-fail": "--on-fail",
+      "inc": "--inc",
+      "inc-bg": "--inc-bg",
+      "focus": "--focus"
+    },
+    "frozenContracts": [
+      "Custom properties --pass, --fail and --inc keep those names.",
+      "badge(status, size) emits badge, badge-pass | badge-fail | badge-incomplete | badge-not_checked, and optionally badge-lg, wrapping glyph and text label.",
+      "All form actions, methods, field names and hidden fields (csrf_token, idempotency_key, row_version) are unchanged by styling work.",
+      "CSP: no inline style element, no style attribute, no inline script, no external stylesheet, no web font. Scripts are separate files under /static/ and optional; copy.js loads on the tenant page only."
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one committing action of a form: solid registrar's ink.",
+      "html": "<button class=\"ds-btn\" type=\"button\">Import website</button>",
+      "css": ".ds-btn { min-height: 2.75rem; padding: 0 1.5rem; border: 1px solid var(--accent); border-radius: 0.375rem; font: 650 1rem/1 var(--font); cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms, border-color 150ms, color 150ms; background: var(--accent); color: var(--on-accent); } .ds-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Repeatable or non-committal actions, including the four equal ANS actions.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Verify DNS</button>",
+      "css": ".ds-btn-secondary { min-height: 2.75rem; padding: 0 1.5rem; border: 1px solid var(--accent); border-radius: 0.375rem; font: 650 1rem/1 var(--font); cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms, border-color 150ms, color 150ms; background: transparent; color: var(--accent); } .ds-btn-secondary:hover { background: var(--sunken); color: var(--accent-hover); border-color: var(--accent-hover); } .ds-btn-secondary:active { transform: translateY(1px); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Zone",
+      "kind": "custom",
+      "refersTo": "button-danger",
+      "description": "Destructive chrome: red border and heading only, no red fill. Holds the only solid red button.",
+      "html": "<section class=\"ds-danger\"><h2>Danger zone</h2><p>Disabling stops this agent from answering on A2A and MCP.</p><button class=\"ds-btn-danger\" type=\"button\">Disable agent</button></section>",
+      "css": ".ds-danger { padding: 1.5rem; border: 1px solid var(--fail); border-radius: 0.375rem; color: var(--fg); font: 400 1rem/1.6 var(--font); } .ds-danger h2 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 650; color: var(--fail); } .ds-danger p { margin: 0 0 1rem; } .ds-btn-danger { min-height: 2.75rem; padding: 0 1.5rem; border: 1px solid var(--accent); border-radius: 0.375rem; font: 650 1rem/1 var(--font); cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms, border-color 150ms, color 150ms; background: var(--fail); border-color: var(--fail); color: var(--on-fail); } .ds-btn-danger:hover { filter: brightness(0.92); } .ds-btn-danger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above, muted hint, strong-rule border; ink border and outline on focus.",
+      "html": "<label class=\"ds-field\">Public website <span class=\"ds-hint\">Must start with https://</span><input class=\"ds-input\" type=\"url\" placeholder=\"https://www.example-cafe.com/\"></label>",
+      "css": ".ds-field { display: grid; gap: 0.5rem; max-width: 40rem; font: 600 0.9375rem/1.6 var(--font); color: var(--fg); } .ds-hint { color: var(--muted); font-weight: 400; font-size: 0.8125rem; } .ds-input { width: 100%; min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 0.375rem; background: var(--surface); color: var(--fg); font: 400 1rem/1.6 var(--font); } .ds-input::placeholder { color: var(--muted); } .ds-input:hover { border-color: var(--fg); } .ds-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; border-color: var(--focus); }"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-pass",
+      "description": "The register's mark: glyph plus written status. Solid sealed PASS, solid no-entry FAIL, hollow dashed INCOMPLETE, thin ring NOT CHECKED.",
+      "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge ds-badge-pass\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.6 8.3l2.3 2.3 4.6-5\"/></svg><span>PASS</span></span> <span class=\"ds-badge ds-badge-fail\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.5 8h7\"/></svg><span>FAIL</span></span> <span class=\"ds-badge ds-badge-incomplete\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-dash\" cx=\"8\" cy=\"8\" r=\"6.5\"/><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"1.6\"/></svg><span>INCOMPLETE</span></span> <span class=\"ds-badge ds-badge-not_checked\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-line\" cx=\"8\" cy=\"8\" r=\"6.5\"/></svg><span>NOT CHECKED</span></span></div>",
+      "css": ".ds-glyph { width: 1.05em; height: 1.05em; flex: none; overflow: visible; } .ds-g-fill { fill: currentColor; } .ds-g-cut { fill: none; stroke: var(--badge-bg, var(--surface)); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; } .ds-g-dash { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 2.4 2; } .ds-g-line { fill: none; stroke: currentColor; stroke-width: 1.4; } .ds-badge { --badge-bg: var(--sunken); display: inline-flex; align-items: center; gap: 0.4em; padding: 0.2em 0.65em 0.2em 0.5em; border: 1px solid currentColor; border-radius: 999px; background: var(--badge-bg); color: var(--muted); font: 700 0.8125rem/1.35 var(--font); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; } .ds-badge-pass { color: var(--pass); --badge-bg: var(--pass-bg); } .ds-badge-fail { color: var(--fail); --badge-bg: var(--fail-bg); } .ds-badge-incomplete { color: var(--inc); --badge-bg: var(--inc-bg); border-style: dashed; } .ds-badge-not_checked { border-style: dashed; } .ds-badge-lg { font-size: 1.125rem; padding: 0.3em 0.85em 0.3em 0.65em; letter-spacing: 0.06em; } .ds-badge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }"
+    },
+    {
+      "name": "Verdict Banner",
+      "kind": "custom",
+      "refersTo": "verdict-fail",
+      "description": "First thing on a proof page: status word at about 3rem beside its glyph, then the gate count. Dashed border when INCOMPLETE.",
+      "html": "<section class=\"ds-verdict ds-verdict-fail\"><div class=\"ds-verdict-word\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.5 8h7\"/></svg><span>FAIL</span></div><div><p class=\"ds-verdict-count\">2 of 5 gates proven</p><p>At least one check failed, so this agent is not verified. The failed lines are marked below.</p></div></section>",
+      "css": ".ds-glyph { width: 1.05em; height: 1.05em; flex: none; overflow: visible; } .ds-g-fill { fill: currentColor; } .ds-g-cut { fill: none; stroke: var(--badge-bg, var(--surface)); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; } .ds-g-dash { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 2.4 2; } .ds-g-line { fill: none; stroke: currentColor; stroke-width: 1.4; } .ds-verdict { --tone: var(--muted); --tone-bg: var(--sunken); display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 1rem 2rem; padding: 2rem; border: 1px solid var(--tone); border-radius: 0.375rem; background: var(--tone-bg); color: var(--fg); font: 400 1rem/1.6 var(--font); font-variant-numeric: tabular-nums; } .ds-verdict-pass { --tone: var(--pass); --tone-bg: var(--pass-bg); } .ds-verdict-fail { --tone: var(--fail); --tone-bg: var(--fail-bg); } .ds-verdict-incomplete { --tone: var(--inc); --tone-bg: var(--inc-bg); border-style: dashed; } .ds-verdict-word { display: inline-flex; align-items: center; gap: 0.3em; color: var(--tone); --badge-bg: var(--tone-bg); font-size: clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem); font-weight: 800; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; } .ds-verdict p { margin: 0; max-width: 48ch; } .ds-verdict .ds-verdict-count { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 0.25rem; }"
+    },
+    {
+      "name": "Register Entries",
+      "kind": "custom",
+      "refersTo": "badge-fail",
+      "description": "Entries on ruled lines with the mark in a fixed 12.5rem margin column. A failed entry stays on its line and its title is struck.",
+      "html": "<ol class=\"ds-register\"><li class=\"ds-entry\"><div class=\"ds-entry-mark\"><span class=\"ds-entry-no\">Gate 2</span><span class=\"ds-badge ds-badge-pass ds-badge-lg\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.6 8.3l2.3 2.3 4.6-5\"/></svg><span>PASS</span></span></div><div class=\"ds-entry-body\"><h3>Public HTTPS</h3><p>Valid public certificate served over TLS.</p></div></li><li class=\"ds-entry\"><div class=\"ds-entry-mark\"><span class=\"ds-entry-no\">Gate 4</span><span class=\"ds-badge ds-badge-incomplete ds-badge-lg\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-dash\" cx=\"8\" cy=\"8\" r=\"6.5\"/><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"1.6\"/></svg><span>INCOMPLETE</span></span></div><div class=\"ds-entry-body\"><h3>Production ANS registration ACTIVE</h3><p>no ANS registration found by the live lookup</p></div></li><li class=\"ds-entry ds-entry-fail\"><div class=\"ds-entry-mark\"><span class=\"ds-entry-no\">Gate 5</span><span class=\"ds-badge ds-badge-fail ds-badge-lg\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.5 8h7\"/></svg><span>FAIL</span></span></div><div class=\"ds-entry-body\"><h3>Verification evidence</h3><p>ANS lifecycle is ACTIVE (live): no ANS registration found for this host.</p></div></li></ol>",
+      "css": ".ds-glyph { width: 1.05em; height: 1.05em; flex: none; overflow: visible; } .ds-g-fill { fill: currentColor; } .ds-g-cut { fill: none; stroke: var(--badge-bg, var(--surface)); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; } .ds-g-dash { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 2.4 2; } .ds-g-line { fill: none; stroke: currentColor; stroke-width: 1.4; } .ds-badge { --badge-bg: var(--sunken); display: inline-flex; align-items: center; gap: 0.4em; padding: 0.2em 0.65em 0.2em 0.5em; border: 1px solid currentColor; border-radius: 999px; background: var(--badge-bg); color: var(--muted); font: 700 0.8125rem/1.35 var(--font); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; } .ds-badge-pass { color: var(--pass); --badge-bg: var(--pass-bg); } .ds-badge-fail { color: var(--fail); --badge-bg: var(--fail-bg); } .ds-badge-incomplete { color: var(--inc); --badge-bg: var(--inc-bg); border-style: dashed; } .ds-badge-not_checked { border-style: dashed; } .ds-badge-lg { font-size: 1.125rem; padding: 0.3em 0.85em 0.3em 0.65em; letter-spacing: 0.06em; } .ds-register { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line-strong); color: var(--fg); font: 400 1rem/1.6 var(--font); } .ds-entry { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr); gap: 0.5rem 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--line); } .ds-entry-mark { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; } .ds-entry-no { font: 600 0.8125rem/1.3 var(--font); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; } .ds-entry-body h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 650; line-height: 1.2; letter-spacing: -0.015em; } .ds-entry-body p { margin: 0; max-width: 65ch; } .ds-entry-fail h3 { text-decoration: line-through; text-decoration-thickness: 0.08em; text-decoration-color: var(--fail); } @media (max-width: 47.99rem) { .ds-entry { grid-template-columns: minmax(0, 1fr); } .ds-entry-mark { flex-direction: row; align-items: center; gap: 0.75rem; } }"
+    },
+    {
+      "name": "Checklist Table",
+      "kind": "custom",
+      "refersTo": "badge-pass",
+      "description": "Ruled table; inside tables the badge is a bare mark with no pill, and a failed row's check label is struck.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody><tr><td><span class=\"ds-mark ds-mark-fail\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.5 8h7\"/></svg><span>FAIL</span></span></td><td><span class=\"ds-struck\">ANS lifecycle is ACTIVE (live)</span></td><td class=\"ds-muted\">no ANS registration found for this host</td></tr><tr><td><span class=\"ds-mark ds-mark-pass\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"7.25\"/><path class=\"ds-g-cut\" d=\"M4.6 8.3l2.3 2.3 4.6-5\"/></svg><span>PASS</span></span></td><td>Canonical agent host</td><td class=\"ds-muted\">host is a canonical public DNS name</td></tr><tr><td><span class=\"ds-mark ds-mark-inc\"><svg class=\"ds-glyph\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle class=\"ds-g-dash\" cx=\"8\" cy=\"8\" r=\"6.5\"/><circle class=\"ds-g-fill\" cx=\"8\" cy=\"8\" r=\"1.6\"/></svg><span>INCOMPLETE</span></span></td><td>Metadata signature / hash</td><td class=\"ds-muted\">nothing provides a hash to verify</td></tr></tbody></table>",
+      "css": ".ds-glyph { width: 1.05em; height: 1.05em; flex: none; overflow: visible; } .ds-g-fill { fill: currentColor; } .ds-g-cut { fill: none; stroke: var(--badge-bg, var(--surface)); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; } .ds-g-dash { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 2.4 2; } .ds-g-line { fill: none; stroke: currentColor; stroke-width: 1.4; } .ds-table { width: 100%; border-collapse: collapse; font: 400 0.9375rem/1.6 var(--font); color: var(--fg); } .ds-table thead th { font-size: 0.8125rem; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px solid var(--line-strong); } .ds-table th, .ds-table td { padding: 0.75rem 1rem 0.75rem 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); } .ds-table tbody tr:hover { background: var(--sunken); } .ds-table tbody tr:hover .ds-mark { --badge-bg: var(--sunken); } .ds-mark { --badge-bg: var(--bg); display: inline-flex; align-items: center; gap: 0.4em; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; } .ds-mark-pass { color: var(--pass); } .ds-mark-fail { color: var(--fail); } .ds-mark-inc { color: var(--inc); } .ds-muted { color: var(--muted); } .ds-struck { text-decoration: line-through; text-decoration-thickness: 0.08em; text-decoration-color: var(--fail); }"
+    },
+    {
+      "name": "Stepper",
+      "kind": "custom",
+      "refersTo": "button-primary",
+      "description": "The register's margin sequence, shared by Create, Find and the tenant stages. Vertical list below 48rem.",
+      "html": "<ol class=\"ds-stepper\"><li class=\"ds-step ds-step-done\"><span class=\"ds-step-mark\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M4.2 8.4l2.5 2.5 5-5.6\"/></svg></span>Import</li><li class=\"ds-step ds-step-current\" aria-current=\"step\"><span class=\"ds-step-mark\">2</span>Review &amp; confirm</li><li class=\"ds-step\"><span class=\"ds-step-mark\">3</span>Publish</li><li class=\"ds-step\"><span class=\"ds-step-mark\">4</span>Register</li></ol>",
+      "css": ".ds-stepper { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 0; margin: 0; padding: 0; font: 500 0.9375rem/1.6 var(--font); } .ds-step { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--muted); } .ds-step:not(:last-child)::after { content: \"\"; width: 2rem; height: 1px; margin: 0 0.75rem; background: var(--line-strong); } .ds-step-mark { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; flex: none; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); font: 600 0.8125rem/1 var(--font); } .ds-step-mark svg { width: 0.9rem; height: 0.9rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .ds-step-current { color: var(--fg); font-weight: 650; } .ds-step-current .ds-step-mark { background: var(--accent); border-color: var(--accent); color: var(--on-accent); } .ds-step-done { color: var(--fg); } .ds-step-done .ds-step-mark { border-color: var(--accent); color: var(--accent); } @media (max-width: 47.99rem) { .ds-stepper { flex-direction: column; align-items: flex-start; gap: 0.75rem; } .ds-step:not(:last-child)::after { display: none; } }"
+    },
+    {
+      "name": "Note, Notice, Alert",
+      "kind": "custom",
+      "refersTo": "notice",
+      "description": "Note is the neutral ruled aside. Notice (amber dashed) is only for genuinely unproven states. Alert (red) is only for something that actually failed.",
+      "html": "<div class=\"ds-notices\"><p class=\"ds-note\">This is a read-only business agent. It cannot take payments, bookings or orders.</p><p class=\"ds-notice\">Nothing imported yet, or the last import failed safely. No partial data was kept.</p><p class=\"ds-alert\" role=\"alert\">Sign-in failed. Check the password and try again.</p></div>",
+      "css": ".ds-notices { display: grid; gap: 1rem; max-width: 65ch; font: 400 1rem/1.6 var(--font); color: var(--fg); } .ds-notices p { margin: 0; } .ds-note { padding: 0.75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); } .ds-notice { padding: 0.75rem 1rem; border: 1px dashed var(--inc); border-radius: 0.375rem; background: var(--inc-bg); } .ds-alert { padding: 0.75rem 1rem; border: 1px solid var(--fail); border-radius: 0.375rem; background: var(--fail-bg); }"
+    },
+    {
+      "name": "State Chip and Copyable Value",
+      "kind": "chip",
+      "refersTo": "state-chip",
+      "description": "A reported lifecycle state is a colourless mono chip. Machine values sit in mono on sunken paper and select whole on one click; copy.js may add a small Copy button.",
+      "html": "<div class=\"ds-values\"><span class=\"ds-state\">PENDING_VALIDATION</span><span class=\"ds-copyable\"><code>_ans.bluedoor.agentdesk-demo.org</code><button class=\"ds-btn-small\" type=\"button\">Copy</button></span></div>",
+      "css": ".ds-values { display: grid; gap: 1rem; justify-items: start; } .ds-state { display: inline-block; padding: 0.15em 0.6em; border: 1px solid var(--line-strong); border-radius: 0.375rem; color: var(--muted); background: var(--surface); font: 600 0.8125rem/1.4 var(--mono); letter-spacing: 0.02em; white-space: nowrap; } .ds-copyable { display: flex; align-items: flex-start; gap: 0.5rem; } .ds-copyable code { padding: 0.25rem 0.5rem; border-radius: 3px; background: var(--sunken); color: var(--fg); font: 400 0.84rem/1.6 var(--mono); user-select: all; overflow-wrap: anywhere; } .ds-btn-small { min-height: 2rem; padding: 0 0.75rem; border: 1px solid var(--accent); border-radius: 0.375rem; background: transparent; color: var(--accent); font: 650 0.8125rem/1 var(--font); cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-small:hover { background: var(--sunken); color: var(--accent-hover); } .ds-btn-small:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary Navigation",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "Sheet-white band over a hairline: brand mark at left, quiet muted links at right with a sunken hover. No active state; wraps instead of collapsing.",
+      "html": "<header class=\"ds-top\"><a class=\"ds-brand\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"2.75\" y=\"2.75\" width=\"18.5\" height=\"18.5\" rx=\"4\"/><path d=\"M7.5 12.4l3 3 6-6.8\"/></svg><span>Agent Desk</span></a><nav class=\"ds-nav\" aria-label=\"Primary\"><a href=\"#\">Create</a><a href=\"#\">Find</a><a href=\"#\">Proof</a><a href=\"#\">Security</a><a href=\"#\">Sign in</a></nav></header>",
+      "css": ".ds-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 1.5rem; padding: 0 1.5rem; background: var(--surface); border-bottom: 1px solid var(--line); font-family: var(--font); } .ds-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; color: var(--fg); font-weight: 700; letter-spacing: -0.01em; text-decoration: none; } .ds-brand svg { width: 1.375rem; height: 1.375rem; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .ds-nav { display: flex; flex-wrap: wrap; gap: 0 0.25rem; } .ds-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--muted); font-size: 0.9375rem; font-weight: 500; text-decoration: none; border-radius: 0.375rem; } .ds-nav a:hover { color: var(--fg); background: var(--sunken); } .ds-nav a:focus-visible, .ds-brand:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Register",
+    "overview": "Agent Desk is a public register. Every fact is an entry on a ruled line, and each entry carries its mark in a fixed margin column to its left. The verification checklist is not decoration laid over a dashboard; it is the composition. A reader sweeps the margin to read the verdicts, then reads across a line to see what was witnessed.\n\nThe system is quiet so that status can be loud. The ground is cool paper-white, text is blue-black, and one accent (registrar's ink) marks everything the reader can act on. Structure comes from hairline rules, not from boxes or shadows. Colour fills are held back for one job: sitting behind a status. A PASS, a FAIL and an INCOMPLETE each have their own shape as well as their own colour, and the word is always written out, so nothing depends on colour alone. A failed entry is never removed or collapsed; it stays on its line and is struck through.\n\nThe whole system ships as one stylesheet under a strict Content-Security-Policy. There are no inline styles, no inline scripts, no external stylesheets and no web fonts. Type is the platform's own system stack. Light and dark themes are the same register in two inks, switched by `prefers-color-scheme` alone.",
+    "keyCharacteristics": [
+      "Entries on ruled lines, marks in a fixed 12.5rem margin column that folds above the entry below 48rem.",
+      "One accent, registrar's ink. No second accent hue anywhere.",
+      "Hairline rules instead of boxes; flat, no shadows.",
+      "Tint fills only behind status: green PASS, red FAIL, amber unproven.",
+      "Three status shapes: solid sealed mark, solid \"no entry\" mark, hollow dashed mark. The text label is always present.",
+      "Monospace only for machine values: hostnames, URLs, DNS values, fingerprints, tool ids, reported states.",
+      "Status is real backend data. It is never invented, rounded up, or implied."
+    ],
+    "rules": [
+      {
+        "name": "The One Ink Rule",
+        "body": "Registrar's ink is the only accent. Anything the reader can act on is ink; nothing else is. Do not introduce a second accent hue, a gradient, or a brand colour borrowed from a partner.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status-Only Tint Rule",
+        "body": "A tinted fill means a status is being reported. Green, red and amber fills never appear as decoration, section backgrounds or emphasis. Everything that is not a status sits on ground, surface or sunken.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Means Failed Rule",
+        "body": "The red fill sits behind a FAIL (verdict banner, FAIL badge) and behind an error alert that reports something that actually failed. Destructive chrome does not get it: the Danger zone is a red border and a red heading on the plain ground, and its button is the only solid red control.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dashed Means Unproven Rule",
+        "body": "A dashed amber frame is reserved for genuinely unproven states: INCOMPLETE, a draft not yet confirmed, an import that produced nothing. A neutral aside is never amber; it is the ruled note (hairline above and below, no fill).",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is Evidence Rule",
+        "body": "Monospace is only for values a machine produced or will consume: hostnames, URLs, DNS names and values, fingerprints and hashes, tool ids, certificate fields, the reported lifecycle state. Prose, labels, headings, buttons and numbers in sentences are never mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Written Status Rule",
+        "body": "A status is always a word (PASS, FAIL, INCOMPLETE, NOT CHECKED) in bold tracked caps next to its glyph. The glyph is hidden from assistive technology; the word is the status. Never render a mark without its word, and never colour a word without its mark.",
+        "section": "typography"
+      },
+      {
+        "name": "The Margin Column Rule",
+        "body": "Marks live in the margin, content lives on the line. A status badge, step number or tool id goes in the left column of an entry, not inline at the end of a heading and not in a card corner.",
+        "section": "layout"
+      },
+      {
+        "name": "The Stack, Don't Squeeze Rule",
+        "body": "A table with more than two columns must be marked stackable and carry a `data-label` on every cell. Below 48rem it becomes labelled blocks; it never becomes letter-stacked columns.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Shadow Rule",
+        "body": "Nothing lifts. If something needs separating, rule it; if it needs recessing, sink it.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Three Shapes Rule",
+        "body": "Solid means decided, dashed means unproven. A PASS and a FAIL are both solid and differ by their cut; an INCOMPLETE is hollow and dashed, and so is its badge border, its verdict border and the notice that explains it. Never give an unproven state a solid frame.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** put every new list of facts on a register: strong rule to open, hairline per entry, mark in the 12.5rem margin, body on the line.",
+      "**Do** write every status as glyph plus word, using the badge macro, and keep the solid/solid/dashed shape language.",
+      "**Do** keep a failed entry on its line and strike its title; leave its explanation readable.",
+      "**Do** use ink for everything actionable and nothing else.",
+      "**Do** reserve amber dashed for the genuinely unproven and use the ruled note for neutral asides.",
+      "**Do** set machine values in mono on sunken paper, and mark DNS-style values copyable.",
+      "**Do** mark multi-column tables stackable and give every cell a `data-label`.",
+      "**Do** draw icons as inline SVG in the template (stroke, round caps, `aria-hidden`, `focusable=\"false\"`) and style them from `app.css`.",
+      "**Do** keep scripts as separate files under `/static/`, loaded only where needed (today: `copy.js` on the tenant page), and make the page complete without them.",
+      "**Do** define every new colour twice, in `:root` and in the `prefers-color-scheme: dark` block, and keep targets at least 2.75rem."
+    ],
+    "donts": [
+      "**Don't** write an inline `<style>`, a `style=\"\"` attribute, an inline `<script>`, an external stylesheet or a web font. The CSP blocks them and the tests fail.",
+      "**Don't** rename `--pass`, `--fail` or `--inc`, change the badge macro's class contract (`badge-pass`, `badge-fail`, `badge-incomplete`, `badge-not_checked`), or change any form field name.",
+      "**Don't** convey status by colour alone, and don't invent, round up or imply a status the backend did not report.",
+      "**Don't** use the red fill for warnings, destructive chrome or emphasis. The Danger zone is a border only.",
+      "**Don't** use amber dashed for ordinary information.",
+      "**Don't** box content in cards or add shadows. Rule it or sink it.",
+      "**Don't** render pill badges inside tables; there the badge is a bare mark.",
+      "**Don't** hide, collapse, reorder or filter out failed entries.",
+      "**Don't** set prose, labels or buttons in mono, and don't introduce a second typeface.",
+      "**Don't** add a second accent colour, a gradient, or GoDaddy logos and brand colours.",
+      "**Don't** add imagery, testimonials, logos or illustration; none exists and none may be fabricated.",
+      "**Don't** add motion beyond 150ms state transitions, and always honour reduced motion."
+    ]
+  }
+}

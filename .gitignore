@@ -36,3 +36,6 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# --- design review screenshots (regenerable, large) ---
+.impeccable/review/

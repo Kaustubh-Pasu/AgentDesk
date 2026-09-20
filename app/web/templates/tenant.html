@@ -1,81 +1,157 @@
 {% extends "base.html" %}
+{% from "_macros.html" import stepper %}
 {% block title %}{{ tenant.display_name }} · Agent Desk{% endblock %}
 {% block content %}
-<p><a href="/create">← all agents</a></p>
-<h1>{{ tenant.display_name }} <span class="state">{{ tenant.state.value }}</span></h1>
-<p>Host <code>{{ tenant.agent_host }}</code> · source <code>{{ tenant.source_domain }}</code> · published version {{ tenant.current_version or "none" }}</p>
+{% set state = tenant.state.value %}
+{% if has_draft %}{% set current = 2 %}
+{% elif state == "ACTIVE" %}{% set current = 5 %}
+{% elif state in ("REVOKED", "DISABLED") %}{% set current = 0 %}
+{% elif published %}{% set current = 4 %}
+{% else %}{% set current = 1 %}{% endif %}
+{% set done = [published and not has_draft, published is not none and published, state == "ACTIVE"] %}
 
-<h2>1 · Imported facts {% if has_draft %}<span class="state">DRAFT — not public until you confirm</span>{% endif %}</h2>
-{% if form %}
-<form method="post" action="/admin/tenants/{{ tenant.id }}/publish" class="stack">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <input type="hidden" name="idempotency_key" value="{{ keys[0] }}">
-  <input type="hidden" name="row_version" value="{{ tenant.row_version }}">
-  <label>Business name <input name="business_name" required maxlength="120" value="{{ form.business_name }}"></label>
-  <label>Description <textarea name="description" rows="3" maxlength="1200">{{ form.description }}</textarea></label>
-  <label>Category <select name="category">{% for c in categories %}<option value="{{ c }}" {% if c == form.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
-  <label>Address <input name="address" maxlength="300" value="{{ form.address }}"></label>
-  <label>Public phone <input name="phone" maxlength="40" value="{{ form.phone }}"></label>
-  <label>Public email <input name="email" maxlength="254" value="{{ form.email }}"></label>
-  <label>Hours — one per line: <code>days | hours</code><textarea name="hours" rows="4">{{ form.hours }}</textarea></label>
-  <label>Services — <code>name | description | price</code><textarea name="services" rows="4">{{ form.services }}</textarea></label>
-  <label>Menu — <code>name | description | price | section</code><textarea name="menu_items" rows="5">{{ form.menu_items }}</textarea></label>
-  <label>FAQ — <code>question | answer</code><textarea name="faq" rows="4">{{ form.faq }}</textarea></label>
-  <fieldset><legend>Capabilities (read-only; fixed allowlist)</legend>
-    {% for c in capabilities %}<label class="check"><input type="checkbox" name="capabilities" value="{{ c }}" {% if c in selected %}checked{% endif %}> {{ c }}</label>{% endfor %}
-  </fieldset>
-  {% if has_draft %}
-  <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed these facts and confirm they are accurate public information about my business.</label>
-  <button type="submit">Confirm &amp; publish</button>
-  {% else %}<p class="muted">This version is published and immutable. Import again to prepare a new version.</p>{% endif %}
-</form>
-{% else %}<p class="muted">Nothing imported yet, or the last import failed safely.</p>{% endif %}
-<form method="post" action="/admin/tenants/{{ tenant.id }}/import" class="inline">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[1] }}">
-  <button type="submit" class="secondary">Import website again</button>
-</form>
-
-<h2>2 · Public endpoints</h2>
-{% if published %}
-<ul class="plain">
-  <li>Agent Card <a href="{{ origin }}/.well-known/agent-card.json"><code>{{ origin }}/.well-known/agent-card.json</code></a></li>
-  <li>A2A <code>{{ origin }}/a2a</code> · MCP <code>{{ origin }}/mcp</code> · <a href="{{ origin }}/proof">proof</a></li>
-</ul>
-{% else %}<p class="muted">Not published.</p>{% endif %}
-
-<h2>3 · GoDaddy ANS registration <span class="muted">({{ environment }})</span></h2>
-{% if not ans_configured %}<p class="alert">No GoDaddy ANS credential is configured on this deployment. Registration is WAITING_FOR_EXTERNAL_INPUT.</p>{% endif %}
-{% if registration %}
-<p>Status reported by GoDaddy: <span class="state">{{ registration.status }}</span>
-   {% if registration.ans_name %}· <code>{{ registration.ans_name }}</code>{% endif %}
-   {% if registration.agent_id %}· agentId <code>{{ registration.agent_id }}</code>{% endif %}
-   {% if registration.last_checked_at %}· checked {{ registration.last_checked_at.isoformat() }}{% endif %}
-   {% if registration.last_error %}· last error <code>{{ registration.last_error }}</code>{% endif %}</p>
-{% if registration.challenge %}
-  {% for group, title in (("acme", "ACME DNS-01 challenge — publish, then Verify ACME"), ("dns", "ANS DNS records — publish, then Verify DNS")) %}
-  {% if registration.challenge.get(group) %}
-  <h3>{{ title }}</h3>
-  <table><thead><tr><th>Name</th><th>Type</th><th>Value</th><th>TTL</th></tr></thead><tbody>
-  {% for r in registration.challenge.get(group) %}<tr><td><code>{{ r.name }}</code></td><td>{{ r.type }}</td><td><code>{{ r.value }}</code></td><td>{{ r.ttl }}</td></tr>{% endfor %}
-  </tbody></table>
-  {% endif %}{% endfor %}
-{% endif %}
-{% else %}<p class="muted">Not submitted.</p>{% endif %}
-<div class="row">
-{% for step, label in (("submit", "Register with ANS"), ("verify_acme", "Verify ACME"), ("verify_dns", "Verify DNS"), ("refresh", "Refresh live status")) %}
-<form method="post" action="/admin/tenants/{{ tenant.id }}/ans/{{ step }}" class="inline">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[loop.index + 1] }}">
-  <button type="submit" class="secondary" {% if not published %}disabled{% endif %}>{{ label }}</button>
-</form>
-{% endfor %}
+<p class="crumb"><a href="/create">← All agents</a></p>
+<div class="page-head">
+  <h1>{{ tenant.display_name }}</h1>
+  <span class="state">{{ state }}</span>
 </div>
-<p class="muted">The status above is copied from the live GoDaddy response. It is never set to ACTIVE locally. DNS records are created by you
-   (or by the operator script), never by this web application.</p>
+<dl class="facts">
+  <dt>Host</dt><dd><code>{{ tenant.agent_host }}</code></dd>
+  <dt>Source</dt><dd><code>{{ tenant.source_domain }}</code></dd>
+  <dt>Published version</dt><dd>{{ tenant.current_version or "none" }}</dd>
+</dl>
+{{ stepper(["Import", "Review & confirm", "Publish", "Register"], current, "Progress of this agent") }}
 
-<h2>Danger zone</h2>
-<form method="post" action="/admin/tenants/{{ tenant.id }}/disable" class="stack narrow">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[6] }}">
-  <label>Password (re-authentication) <input type="password" name="password" maxlength="256" autocomplete="current-password"></label>
-  <button type="submit" class="danger">Disable agent</button>
-</form>
+<section class="stage" aria-labelledby="stage-facts">
+  <div class="stage-head">
+    <span class="step-mark{% if done[0] %} is-done{% endif %}" aria-hidden="true">{% if done[0] %}<svg viewBox="0 0 16 16" focusable="false"><path d="M4.2 8.4l2.5 2.5 5-5.6"/></svg>{% else %}1{% endif %}</span><span class="visually-hidden">Stage 1{% if done[0] %} (done){% endif %}</span>
+    <h2 id="stage-facts">Imported facts</h2>
+  </div>
+  {% if form and has_draft %}
+  <div class="draft-bar" role="status">
+    <strong>DRAFT</strong>
+    <span>Not public until you confirm. Review every field below, then confirm and publish.</span>
+  </div>
+  <form method="post" action="/admin/tenants/{{ tenant.id }}/publish" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="idempotency_key" value="{{ keys[0] }}">
+    <input type="hidden" name="row_version" value="{{ tenant.row_version }}">
+    <label>Business name <input name="business_name" required maxlength="120" value="{{ form.business_name }}"></label>
+    <label>Description <textarea class="prose" name="description" rows="3" maxlength="1200">{{ form.description }}</textarea></label>
+    <label>Category <select name="category">{% for c in categories %}<option value="{{ c }}" {% if c == form.category %}selected{% endif %}>{{ c|replace("_", " ") }}</option>{% endfor %}</select></label>
+    <label>Address <input name="address" maxlength="300" value="{{ form.address }}" autocomplete="off"></label>
+    <label>Public phone <input name="phone" maxlength="40" value="{{ form.phone }}" inputmode="tel" autocomplete="off"></label>
+    <label>Public email <input name="email" maxlength="254" value="{{ form.email }}" inputmode="email" autocomplete="off"></label>
+    <label>Hours <span class="hint">One per line, as <code>days | hours</code>. Example: <code>Mon-Fri | 7am - 6pm</code></span>
+      <textarea name="hours" rows="4" spellcheck="false">{{ form.hours }}</textarea></label>
+    <label>Services <span class="hint">One per line, as <code>name | description | price</code></span>
+      <textarea name="services" rows="4" spellcheck="false">{{ form.services }}</textarea></label>
+    <label>Menu <span class="hint">One per line, as <code>name | description | price | section</code></span>
+      <textarea name="menu_items" rows="5" spellcheck="false">{{ form.menu_items }}</textarea></label>
+    <label>FAQ <span class="hint">One per line, as <code>question | answer</code></span>
+      <textarea name="faq" rows="4" spellcheck="false">{{ form.faq }}</textarea></label>
+    <fieldset><legend>Capabilities (read-only; fixed allowlist)</legend>
+      {% for c in capabilities %}<label class="check"><input type="checkbox" name="capabilities" value="{{ c }}" {% if c in selected %}checked{% endif %}> {{ c|replace("_", " ") }}</label>{% endfor %}
+    </fieldset>
+    <div class="draft-bar">
+      <strong>DRAFT</strong>
+      <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed these facts and confirm they are accurate public information about my business.</label>
+    </div>
+    <button type="submit">Confirm &amp; publish</button>
+  </form>
+  {% elif form %}
+  <p class="muted">Version {{ tenant.current_version }} is published and immutable. Import again to prepare a new version.</p>
+  <dl class="facts">
+    <dt>Business name</dt><dd>{{ form.business_name }}</dd>
+    <dt>Description</dt><dd>{{ form.description or "—" }}</dd>
+    <dt>Category</dt><dd>{{ form.category|replace("_", " ") }}</dd>
+    <dt>Address</dt><dd>{{ form.address or "—" }}</dd>
+    <dt>Public phone</dt><dd>{{ form.phone or "—" }}</dd>
+    <dt>Public email</dt><dd>{{ form.email or "—" }}</dd>
+    <dt>Hours</dt><dd><pre>{{ form.hours or "—" }}</pre></dd>
+    <dt>Services</dt><dd><pre>{{ form.services or "—" }}</pre></dd>
+    <dt>Menu</dt><dd><pre>{{ form.menu_items or "—" }}</pre></dd>
+    <dt>FAQ</dt><dd><pre>{{ form.faq or "—" }}</pre></dd>
+    <dt>Capabilities</dt><dd>{{ selected|sort|join(", ")|replace("_", " ") }}</dd>
+  </dl>
+  {% else %}
+  <p class="notice">Nothing imported yet, or the last import failed safely. Try the import again; no partial data was kept.</p>
+  {% endif %}
+  <form method="post" action="/admin/tenants/{{ tenant.id }}/import" class="actions">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[1] }}">
+    <button type="submit" class="secondary">Import website again</button>
+    {% if has_draft %}<span class="hint">Importing again replaces this draft, including your edits.</span>{% endif %}
+  </form>
+</section>
+
+<section class="stage" aria-labelledby="stage-endpoints">
+  <div class="stage-head">
+    <span class="step-mark{% if done[1] %} is-done{% endif %}" aria-hidden="true">{% if done[1] %}<svg viewBox="0 0 16 16" focusable="false"><path d="M4.2 8.4l2.5 2.5 5-5.6"/></svg>{% else %}2{% endif %}</span><span class="visually-hidden">Stage 2{% if done[1] %} (done){% endif %}</span>
+    <h2 id="stage-endpoints">Public endpoints</h2>
+  </div>
+  {% if published %}
+  <dl class="facts">
+    <dt>Agent Card</dt><dd><a href="{{ origin }}/.well-known/agent-card.json"><code>{{ origin }}/.well-known/agent-card.json</code></a></dd>
+    <dt>A2A</dt><dd><code>{{ origin }}/a2a</code></dd>
+    <dt>MCP</dt><dd><code>{{ origin }}/mcp</code></dd>
+    <dt>Proof</dt><dd><a href="{{ origin }}/proof">{{ origin }}/proof</a></dd>
+  </dl>
+  {% else %}<p class="muted">Not published. Endpoints appear here after you confirm and publish.</p>{% endif %}
+</section>
+
+<section class="stage" aria-labelledby="stage-ans">
+  <div class="stage-head">
+    <span class="step-mark{% if done[2] %} is-done{% endif %}" aria-hidden="true">{% if done[2] %}<svg viewBox="0 0 16 16" focusable="false"><path d="M4.2 8.4l2.5 2.5 5-5.6"/></svg>{% else %}3{% endif %}</span><span class="visually-hidden">Stage 3{% if done[2] %} (done){% endif %}</span>
+    <h2 id="stage-ans">GoDaddy ANS registration</h2>
+    <span class="muted">{{ environment }}</span>
+  </div>
+  {% if not ans_configured %}<p class="notice">No GoDaddy ANS credential is configured on this deployment. Registration is WAITING_FOR_EXTERNAL_INPUT.</p>{% endif %}
+  {% if registration %}
+  <dl class="facts">
+    <dt>Status reported by GoDaddy</dt><dd><span class="state">{{ registration.status }}</span></dd>
+    {% if registration.ans_name %}<dt>ANS name</dt><dd><code>{{ registration.ans_name }}</code></dd>{% endif %}
+    {% if registration.agent_id %}<dt>agentId</dt><dd><code>{{ registration.agent_id }}</code></dd>{% endif %}
+    {% if registration.last_checked_at %}<dt>Last checked</dt><dd>{{ registration.last_checked_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}</dd>{% endif %}
+    {% if registration.last_error %}<dt>Last error</dt><dd><code>{{ registration.last_error }}</code></dd>{% endif %}
+  </dl>
+  {% if registration.challenge %}
+    {% for group, title in (("acme", "ACME DNS-01 challenge — publish, then Verify ACME"), ("dns", "ANS DNS records — publish, then Verify DNS")) %}
+    {% if registration.challenge.get(group) %}
+    <h3>{{ title }}</h3>
+    <div class="table-wrap">
+    <table class="stackable dns">
+      <thead><tr><th>Name</th><th>Type</th><th>Value</th><th>TTL</th></tr></thead><tbody>
+      {% for r in registration.challenge.get(group) %}<tr>
+        <td data-label="Name"><span class="copyable" data-copy><code>{{ r.name }}</code></span></td>
+        <td data-label="Type" class="nowrap">{{ r.type }}</td>
+        <td data-label="Value"><span class="copyable" data-copy><code>{{ r.value }}</code></span></td>
+        <td data-label="TTL" class="nowrap">{{ r.ttl }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}{% endfor %}
+  {% endif %}
+  {% else %}<p class="muted">Not submitted.</p>{% endif %}
+  <div class="actions">
+  {% for step, label in (("submit", "Register with ANS"), ("verify_acme", "Verify ACME"), ("verify_dns", "Verify DNS"), ("refresh", "Refresh live status")) %}
+  <form method="post" action="/admin/tenants/{{ tenant.id }}/ans/{{ step }}" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[loop.index + 1] }}">
+    <button type="submit" class="secondary" {% if not published %}disabled{% endif %}>{{ label }}</button>
+  </form>
+  {% endfor %}
+  </div>
+  <p class="muted">The status above is copied from the live GoDaddy response. It is never set to ACTIVE locally. DNS records are created by you
+     (or by the operator script), never by this web application.</p>
+</section>
+
+<section class="danger-zone" aria-labelledby="danger">
+  <h2 id="danger">Danger zone</h2>
+  <p>Disabling stops this agent from answering on A2A and MCP and removes its public pages. It does not revoke the ANS registration.</p>
+  <form method="post" action="/admin/tenants/{{ tenant.id }}/disable" class="stack narrow">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[6] }}">
+    <label>Password (re-authentication) <input type="password" name="password" maxlength="256" autocomplete="current-password"></label>
+    <button type="submit" class="danger">Disable agent</button>
+  </form>
+</section>
 {% endblock %}
+{% block scripts %}<script src="/static/copy.js" defer></script>{% endblock %}

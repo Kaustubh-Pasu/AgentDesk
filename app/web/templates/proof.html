@@ -1,31 +1,64 @@
 {% extends "base.html" %}
-{% from "_macros.html" import badge %}
+{% from "_macros.html" import badge, glyph %}
 {% block title %}Proof · {{ proof.agent_host }}{% endblock %}
 {% block content %}
-<h1>Proof for <code>{{ proof.agent_host }}</code> {{ badge(proof.decision) }}</h1>
-<p class="muted">Generated {{ proof.generated_at }} from live checks{% if proof.cached %} (cached for a few seconds){% endif %}. ANS environment: {{ proof.environment }}.
-   <a href="/api/proof">JSON</a></p>
-<section class="gates">
-{% for g in proof.gates %}
-  <article class="gate">
-    <h2>Gate {{ g.gate }} · {{ g.title }} {{ badge(g.status) }}</h2>
-    <p>{{ g.detail }}</p>
-    {% if g.evidence %}<dl>{% for k, v in g.evidence.items() %}<dt>{{ k }}</dt><dd><code>{{ v if v is string else v|tojson }}</code></dd>{% endfor %}</dl>{% endif %}
-  </article>
-{% endfor %}
+{% set passed = proof.gates|selectattr("status", "equalto", "PASS")|list|length %}
+{% set total = proof.gates|length %}
+{% set decision = proof.decision|lower %}
+<h1>Verification proof</h1>
+<p class="lede"><code>{{ proof.agent_host }}</code></p>
+
+<section class="verdict verdict-{{ decision }}" aria-label="Overall result">
+  <div class="verdict-word">{{ glyph(proof.decision) }}<span>{{ proof.decision }}</span></div>
+  <div class="verdict-body">
+    <p class="verdict-count">{{ passed }} of {{ total }} gates proven</p>
+    <p>{% if decision == "pass" %}Every mandatory check passed when this page was generated.
+       {% elif decision == "fail" %}At least one check failed, so this agent is not verified. The failed lines are marked below.
+       {% else %}Some mandatory checks could not be proven, so this agent is not verified yet.{% endif %}</p>
+  </div>
 </section>
-<h2>Verification checklist</h2>
-<table><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>
+<p class="muted">Generated {{ proof.generated_at[:19]|replace("T", " ") }} UTC from live checks{% if proof.cached %} (cached for a few seconds){% endif %}. ANS environment: {{ proof.environment }}.
+   <a href="/api/proof">View as JSON</a></p>
+
+<h2 id="gates">The five gates</h2>
+<ol class="register">
+{% for g in proof.gates %}
+  <li class="entry entry-{{ g.status|lower }}" id="gate-{{ g.gate }}">
+    <div class="entry-mark"><span class="entry-no">Gate {{ g.gate }}</span>{{ badge(g.status, "lg") }}</div>
+    <div class="entry-body">
+      <h3>{{ g.title }}</h3>
+      <p>{{ g.detail }}</p>
+      {% if g.evidence %}<dl class="facts">{% for k, v in g.evidence.items() %}<dt>{{ k|replace("_", " ") }}</dt><dd><code>{{ v if v is string else v|tojson }}</code></dd>{% endfor %}</dl>{% endif %}
+    </div>
+  </li>
+{% endfor %}
+</ol>
+
+<h2 id="checks">Verification checklist</h2>
+<p class="muted">{{ proof.verification.checks|selectattr("status", "equalto", "PASS")|list|length }} of {{ proof.verification.checks|length }} checks passed.
+   Optional checks never block a PASS, but a FAIL on any line does.</p>
+<div class="table-wrap">
+<table class="stackable"><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>
 {% for c in proof.verification.checks %}
-  <tr><td>{{ badge(c.status) }}</td><td>{{ c.label }}{% if not c.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td class="muted">{{ c.detail }}</td></tr>
+  <tr class="row-{{ c.status|lower }}"><td data-label="Result" class="nowrap">{{ badge(c.status) }}</td><td data-label="Check"><span class="check-label">{{ c.label }}</span>{% if not c.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td data-label="Detail" class="muted">{{ c.detail }}</td></tr>
 {% endfor %}</tbody></table>
+</div>
+
 {% if proof.verification.identity_certificate %}
 {% set cert = proof.verification.identity_certificate %}
-<h2>ANS identity certificate (public)</h2>
-<dl><dt>Subject</dt><dd><code>{{ cert.subject }}</code></dd><dt>Issuer</dt><dd><code>{{ cert.issuer }}</code></dd>
-<dt>SAN</dt><dd><code>{{ cert.san|join(", ") }}</code></dd><dt>Serial</dt><dd><code>{{ cert.serial }}</code></dd>
-<dt>SHA-256</dt><dd><code>{{ cert.sha256 }}</code></dd><dt>Valid</dt><dd>{{ cert.valid_from }} → {{ cert.valid_to }}</dd>
-<dt>Chain</dt><dd>{{ badge(cert.chain_status) }} {{ cert.chain_reason }}</dd><dt>Binding</dt><dd>{{ badge(cert.binding_status) }} {{ cert.binding_reason }}</dd></dl>
+<h2 id="certificate">ANS identity certificate (public)</h2>
+<dl class="facts">
+  <dt>Subject</dt><dd><code>{{ cert.subject }}</code></dd>
+  <dt>Issuer</dt><dd><code>{{ cert.issuer }}</code></dd>
+  <dt>SAN</dt><dd><code>{{ cert.san|join(", ") }}</code></dd>
+  <dt>Serial</dt><dd><code>{{ cert.serial }}</code></dd>
+  <dt>SHA-256</dt><dd><code>{{ cert.sha256 }}</code></dd>
+  <dt>Valid</dt><dd>{{ cert.valid_from }} → {{ cert.valid_to }}</dd>
+  <dt>Chain</dt><dd>{{ badge(cert.chain_status) }} {{ cert.chain_reason }}</dd>
+  <dt>Binding</dt><dd>{{ badge(cert.binding_status) }} {{ cert.binding_reason }}</dd>
+</dl>
 {% endif %}
-<ul class="plain muted">{% for n in proof.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+
+<h2>How to read this</h2>
+<ul class="muted">{% for n in proof.notes %}<li>{{ n }}</li>{% endfor %}</ul>
 {% endblock %}

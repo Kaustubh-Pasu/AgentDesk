@@ -1,17 +1,29 @@
 {% extends "base.html" %}
 {% block title %}{{ agent.display_name }} · agent{% endblock %}
 {% block content %}
-<h1>{{ agent.display_name }}</h1>
-<p>{{ agent.description }}</p>
-<p class="muted">Read-only business agent v{{ agent.version }}, served by the Agent Desk generic runtime. It cannot take
+<section class="hero">
+  <h1>{{ agent.display_name }}</h1>
+  <p class="lede">{{ agent.description }}</p>
+</section>
+<p class="note">This is a read-only business agent (version {{ agent.version }}), served by the Agent Desk generic runtime. It cannot take
    payments, bookings or orders.</p>
-<h2>Endpoints</h2>
-<ul class="plain">
-  <li>A2A Agent Card: <a href="/.well-known/agent-card.json"><code>{{ origin }}/.well-known/agent-card.json</code></a></li>
-  <li>A2A JSON-RPC: <code>{{ origin }}/a2a</code></li>
-  <li>MCP (Streamable HTTP): <code>{{ origin }}/mcp</code> · <a href="/.well-known/mcp.json">metadata</a></li>
-  <li><a href="/proof">Verification proof</a> · <a href="/api/proof">JSON</a></li>
+<p><a href="/proof">See the live verification proof for this agent</a> · <a href="/api/proof">JSON</a></p>
+
+<h2>What you can ask</h2>
+<ul class="register">
+{% for skill in skills %}
+  <li class="entry">
+    <div class="entry-mark"><code class="entry-no">{{ skill.id }}</code></div>
+    <div class="entry-body"><h3>{{ skill.name }}</h3><p>{{ skill.description }}</p></div>
+  </li>
+{% endfor %}
 </ul>
-<h2>Skills</h2>
-<ul>{% for skill in skills %}<li><strong>{{ skill.name }}</strong> — {{ skill.description }}</li>{% endfor %}</ul>
+
+<h2>Endpoints for other agents</h2>
+<dl class="endpoints">
+  <dt>agent card</dt><dd><a href="/.well-known/agent-card.json">{{ origin }}/.well-known/agent-card.json</a></dd>
+  <dt>a2a json-rpc</dt><dd>{{ origin }}/a2a</dd>
+  <dt>mcp</dt><dd>{{ origin }}/mcp</dd>
+  <dt>mcp metadata</dt><dd><a href="/.well-known/mcp.json">{{ origin }}/.well-known/mcp.json</a></dd>
+</dl>
 {% endblock %}

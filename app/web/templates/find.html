@@ -1,35 +1,58 @@
 {% extends "base.html" %}
-{% from "_macros.html" import badge %}
+{% from "_macros.html" import badge, stepper %}
 {% block title %}Find agent · Agent Desk{% endblock %}
 {% block content %}
 <h1>Find agent</h1>
-<form method="post" action="/find" class="stack">
-  <label>What capability do you need? <input name="query" required minlength="2" maxlength="300" value="{{ form.query }}" placeholder="a coffee shop agent that knows opening hours"></label>
-  <label>…or an exact agent hostname (optional) <input name="exact_host" maxlength="253" value="{{ form.exact_host }}" placeholder="{{ settings_view.demo_host }}"></label>
-  <label>Question for the verified agent (optional, read-only) <input name="question" maxlength="500" value="{{ form.question }}" placeholder="When are you open on Saturday?"></label>
-  <button type="submit">Discover → verify → communicate</button>
-</form>
+<p class="lede">Search the Agent Name Service, verify each candidate against live evidence, then ask the verified agent a question.</p>
 {% if outcome %}
-<h2>Steps</h2>
-<ol>{% for step in outcome.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+  {% if outcome.remote_reply %}{% set current = 4 %}{% elif outcome.chosen %}{% set current = 3 %}{% elif outcome.candidates %}{% set current = 2 %}{% else %}{% set current = 1 %}{% endif %}
+{% else %}{% set current = 0 %}{% endif %}
+{{ stepper(["Discover", "Verify", "Communicate"], current, "How a search runs") }}
+
+<form method="post" action="/find" class="stack">
+  <label>What capability do you need?
+    <input name="query" required minlength="2" maxlength="300" value="{{ form.query }}" placeholder="a coffee shop agent that knows opening hours"></label>
+  <label>Exact agent hostname <span class="hint">Optional. Skips the search and verifies this host directly.</span>
+    <input name="exact_host" maxlength="253" value="{{ form.exact_host }}" placeholder="{{ settings_view.demo_host }}" autocapitalize="none" spellcheck="false"></label>
+  <label>Question for the verified agent <span class="hint">Optional and read-only. Only sent if a candidate passes verification.</span>
+    <input name="question" maxlength="500" value="{{ form.question }}" placeholder="When are you open on Saturday?"></label>
+  <button type="submit">Search and verify</button>
+</form>
+
+{% if outcome %}
+<h2>What happened</h2>
+<ol class="steps-log">{% for step in outcome.steps %}<li>{{ step }}</li>{% endfor %}</ol>
 {% if outcome.error %}<p class="alert">{{ outcome.error }}</p>{% endif %}
 <p class="muted">Intent tags: {{ outcome.intent.tags|join(", ") }} · keywords: {{ outcome.intent.keywords|join(", ") }}</p>
+
+{% if outcome.candidates %}<h2>Candidates</h2>{% endif %}
 {% for c in outcome.candidates %}
 <article class="candidate">
-  <h3>{{ c.display_name or c.agent_host }} {{ badge(c.decision) }}</h3>
-  <p><code>{{ c.agent_host }}</code> · {{ c.ans_name or "no ANS name" }} · ANS status {{ c.ans_status or "n/a" }}
-     {% if c.trust_score is not none %}· trust score {{ c.trust_score }} <span class="muted">(informational only)</span>{% endif %}</p>
+  <div class="candidate-head">
+    <h3>{{ c.display_name or c.agent_host }}</h3>
+    {{ badge(c.decision, "lg") }}
+  </div>
+  <p class="candidate-meta"><code>{{ c.agent_host }}</code> · {{ c.ans_name or "no ANS name" }} · ANS status {{ c.ans_status or "n/a" }}
+     {% if c.trust_score is not none %}· trust score {{ c.trust_score }} (informational only){% endif %}</p>
   {% if c.checks %}
   <details {% if not c.verified %}open{% endif %}><summary>{{ c.checks|length }} verification checks</summary>
-  <table><tbody>{% for k in c.checks %}
-    <tr><td>{{ badge(k.status) }}</td><td>{{ k.label }}{% if not k.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td class="muted">{{ k.detail }}</td></tr>
-  {% endfor %}</tbody></table></details>
+  <div class="table-wrap">
+  <table class="stackable"><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>{% for k in c.checks %}
+    <tr class="row-{{ k.status|lower }}"><td data-label="Result" class="nowrap">{{ badge(k.status) }}</td><td data-label="Check"><span class="check-label">{{ k.label }}</span>{% if not k.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td data-label="Detail" class="muted">{{ k.detail }}</td></tr>
+  {% endfor %}</tbody></table>
+  </div></details>
   {% endif %}
 </article>
 {% endfor %}
+
 {% if outcome.remote_reply %}
-<h2>Reply from {{ outcome.chosen }} <span class="muted">via {{ outcome.remote_reply.protocol }}</span></h2>
-<blockquote class="untrusted"><strong>Untrusted remote content — shown as text only.</strong>
+<h2>Reply from {{ outcome.chosen }}</h2>
+<blockquote class="untrusted">
+  <div class="untrusted-head">
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>
+    <strong>Untrusted remote content — shown as text only.</strong>
+    <span class="muted">Received via {{ outcome.remote_reply.protocol }}. Agent Desk never acts on it.</span>
+  </div>
 <pre>{{ outcome.remote_reply.text }}</pre></blockquote>
 {% endif %}
 {% endif %}
