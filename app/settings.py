@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     hsts_enabled: bool = True
     # CIDRs of reverse proxies whose X-Forwarded-For we trust (Caddy's private network).
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
+    # Names the reverse proxy / health checks use to reach this service over the PRIVATE network. Accepted as a
+    # Host header only for /internal/tls-ask and /healthz, and only from loopback or TRUSTED_PROXY_CIDRS peers.
+    internal_service_hosts: str = "desk,localhost,127.0.0.1"
     login_progressive_delay: bool = True
     # Optional machine API (/api/v1/*) bearer tokens. Empty → token auth disabled (endpoints return 401).
     api_token_secret: SecretStr = SecretStr("")

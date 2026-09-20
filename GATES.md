@@ -81,14 +81,16 @@ The same run surfaced two differences between the live API and the written contr
 
 | Check | Result |
 |---|---|
-| `uv run pytest` | **475 passed** (no network required) |
-| `uv run python scripts/security_self_test.py` | 31/31 control groups PASS; ANS EVIDENCE section `NOT RUN` (no deployed host) |
+| `uv run pytest` | **478 passed** (no network required) — re-run 2026-09-19 22:55 EDT |
+| `uv run python scripts/security_self_test.py` | all control groups PASS (478/478 cases); ANS EVIDENCE section `NOT RUN` (no deployed host) |
 | `uv run ruff check .` / `uv run ruff format --check .` | clean |
 | `uv run mypy app scripts deploy/ans_register.py` | clean |
 | `uv run pip-audit` | no known vulnerabilities |
 | `alembic upgrade head` | OK on SQLite; PostgreSQL trigger statements **not executed** here (no PostgreSQL available) |
 | App boot under `uvicorn --factory app.main:app_factory` | OK: `/healthz`, Agent Card, MCP tool call, UI, unknown Host → 400 |
-| `docker compose config`, `caddy validate`, image build | **not run** — Docker and Caddy are not installed on the build machine |
+| `caddy validate` | **Valid configuration** for `deploy/Caddyfile` as shipped AND with the optional tenant block uncommented — official Caddy v2.11.4 binary (SHA-512 checked against the release checksums), placeholder `BASE_DOMAIN`/`ACME_EMAIL` |
+| `docker compose -f deploy/docker-compose.yml config -q` | exit 0 (Compose v2.38.1, placeholder `secrets/*.env` files in a scratch copy) |
+| Image build / `docker compose up` | **not run here** — the Docker daemon is not running on the build machine |
 
 ## Build log
 
@@ -106,3 +108,12 @@ The same run surfaced two differences between the live API and the written contr
   and scraper roles.
 - 2026-09-19 — Deploy/docs: Alembic migration, Dockerfile, Caddyfile, hardened compose, firewall script, resumable
   `deploy/ans_register.py`, operator scripts, README, SECURITY.md, `.env.example`. Lint/type/audit clean.
+- 2026-09-19 (late) — Go-live fixes found while deploying:
+  - **Bug fixed:** Caddy's on-demand-TLS `ask` request (`http://desk:8000/internal/tls-ask`, Host = service name) was
+    rejected by the trusted-host check with `400 invalid_host`, so no generated tenant could ever obtain a certificate.
+    The check now admits the internal service name for exactly `/internal/tls-ask` and `/healthz`, safe methods only,
+    and only from loopback / `TRUSTED_PROXY_CIDRS` peers (regression test added; verified failing before the fix).
+  - `deploy/Caddyfile` now manages only the two gate hosts by default; the tenant wildcard block is an opt-in
+    (commented, validated). The `:443 { tls internal }` catch-all was dropped.
+  - `deploy/ans_register.py --skip-preflight` for hosts that cannot reach their own public name (hairpin NAT). It is
+    opt-in, announced in the output, and never shortcuts the registry's own validation (tests added).

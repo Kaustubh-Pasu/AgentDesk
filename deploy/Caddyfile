@@ -71,21 +71,21 @@
 	}
 }
 
-# Explicit hosts (Gate 2/3): certificates are obtained at start-up.
+# Explicit hosts (Gate 2/3): certificates are obtained automatically via Let's Encrypt.
 desk.{$BASE_DOMAIN}, demo.{$BASE_DOMAIN} {
 	import agentdesk
 }
 
-# Generated tenant agents: direct children of BASE_DOMAIN only, certificate on demand after the app's "ask" check.
-*.{$BASE_DOMAIN} {
-	tls {
-		on_demand
-	}
-	import agentdesk
-}
-
-# Anything else (bare IP, unknown names) gets nothing.
-:443 {
-	tls internal
-	respond 421
-}
+# OPTIONAL — generated tenant agents (<label>.BASE_DOMAIN). Off by default so the two gate hosts above stay the
+# only thing Caddy manages. To enable: (1) add a wildcard DNS record  *.BASE_DOMAIN  A  <this server>,
+# (2) uncomment the block, (3) `docker compose -f deploy/docker-compose.yml restart caddy`.
+# A certificate is requested on demand ONLY after the app's private "ask" endpoint (global options above) confirms
+# the name is a published agent, so random SNI names from scanners cannot trigger issuance. Both variants of this
+# file were checked with `caddy validate` (Caddy 2.11).
+#
+# *.{$BASE_DOMAIN} {
+# 	tls {
+# 		on_demand
+# 	}
+# 	import agentdesk
+# }

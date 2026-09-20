@@ -140,6 +140,37 @@ async def test_host_header_poisoning_rejected(web: Web) -> None:
     assert "evil.example.com" not in page.text
 
 
+async def test_tls_ask_is_reachable_only_from_the_proxy_network_under_the_internal_name(web: Web) -> None:
+    """Caddy's on-demand-TLS ``ask`` arrives as http://desk:8000/internal/tls-ask (Host = the service name).
+    Regression: it used to be rejected as an unknown Host, so no generated tenant could ever get a certificate."""
+    import httpx
+
+    def caller(peer: str) -> httpx.AsyncClient:
+        transport = httpx.ASGITransport(app=web.app, client=(peer, 40000))  # type: ignore[arg-type]
+        return httpx.AsyncClient(transport=transport, base_url="http://desk:8000")
+
+    async with caller("127.0.0.1") as proxy:  # 127.0.0.1/32 is TRUSTED_PROXY_CIDRS in the test settings
+        served = await proxy.get("/internal/tls-ask", params={"domain": DEMO})
+        unknown = await proxy.get("/internal/tls-ask", params={"domain": f"not-a-tenant.{BASE}"})
+        foreign = await proxy.get("/internal/tls-ask", params={"domain": "evil.example.com"})
+        missing = await proxy.get("/internal/tls-ask")
+        health = await proxy.get("/healthz")
+        # The exception is path- and method-exact: nothing else is served under the internal name.
+        for path in ("/", "/login", "/proof", "/api/proof", "/.well-known/agent-card.json", "/internal/x"):
+            assert (await proxy.get(path)).status_code == 400, path
+        assert (await proxy.post("/internal/tls-ask", params={"domain": DEMO})).status_code == 400
+        for spoof in ("desk.evil.com", "desk:notaport", "xdesk", "desk.", f"desk.{BASE}.evil.com"):
+            r = await proxy.get("/internal/tls-ask", params={"domain": DEMO}, headers={"Host": spoof})
+            assert r.status_code == 400, spoof
+    statuses = [r.status_code for r in (served, unknown, foreign, missing, health)]
+    assert statuses == [200, 404, 404, 404, 200]
+
+    # Same Host header from an untrusted TCP peer → still an unknown host.
+    async with caller("203.0.113.9") as outsider:
+        rejected = await outsider.get("/internal/tls-ask", params={"domain": DEMO})
+    assert rejected.status_code == 400 and rejected.json()["error"]["code"] == "invalid_host"
+
+
 async def test_admin_surface_does_not_exist_on_tenant_hosts(web: Web) -> None:
     async with web.client(DEMO) as client:
         for path in ("/login", "/create", "/find", "/security", f"/admin/tenants/{uuid.uuid4()}"):

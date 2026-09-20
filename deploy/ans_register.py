@@ -234,12 +234,15 @@ async def main_async(args: argparse.Namespace) -> int:
                 state = {"agent_id": found[0].agent_id}
             snapshot = await flow.refresh(state["agent_id"], host, agent.version)
         else:
-            say("\n[2] Public HTTPS / A2A / MCP check (from this machine, through the public internet):")
-            if not await check_public(settings, host):
-                say(
-                    "Public endpoints are not healthy. Fix Gates 1–3 first; ANS validation would fail. Nothing was registered."
-                )
-                return EXIT_FAILED
+            if not args.skip_preflight:
+                say("\n[2] Public HTTPS / A2A / MCP check (from this machine, through the public internet):")
+                if not await check_public(settings, host):
+                    say(
+                        "Public endpoints are not healthy. Fix Gates 1–3 first; ANS validation would fail. Nothing was registered."
+                    )
+                    return EXIT_FAILED
+            else:
+                say("\n[2] Public preflight skipped (--skip-preflight: verified externally).")
             say("\n[3] gddy CLI:")
             gddy_report()
             say("\n[4–5] Generating/loading keys + CSRs and submitting POST /v1/agents/register …")
@@ -363,6 +366,11 @@ def main() -> int:
         "--yes",
         action="store_true",
         help="skip the per-record confirmation prompt (still runs the dry-run first)",
+    )
+    parser.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="skip local preflight check if public reachability was verified externally",
     )
     parser.add_argument("--timeout", type=float, default=600.0, help="seconds to poll for a status change")
     if os.environ.get("ENV") == "production" and os.geteuid() == 0:

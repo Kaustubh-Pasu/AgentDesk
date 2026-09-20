@@ -125,19 +125,51 @@ class CorrelationMiddleware:
             correlation_id_var.reset(token)
 
 
+#: The ONLY paths a private-network caller may request under the service's internal name (see below).
+INTERNAL_CALL_PATHS = frozenset({"/internal/tls-ask", "/healthz"})
+
+
 class TrustedHostMiddleware:
-    """Only BASE_DOMAIN children are served; anything else is a 400 (Host-header poisoning defence)."""
+    """Only BASE_DOMAIN children are served; anything else is a 400 (Host-header poisoning defence).
+
+    One narrow exception: the reverse proxy's on-demand-TLS ``ask`` call and container health checks reach the app
+    over the private network as ``http://desk:8000/...``, so their Host header is the service name. That is accepted
+    only when ALL of these hold: a safe method, one of ``INTERNAL_CALL_PATHS``, an exact configured internal name,
+    and a TCP peer that is loopback or inside ``TRUSTED_PROXY_CIDRS``. Public traffic can never satisfy it: Caddy
+    answers 404 for ``/internal/*`` itself and only ever forwards requests for BASE_DOMAIN site names.
+    """
 
     def __init__(self, app: ASGIApp, settings: Settings, extra_hosts: frozenset[str] = frozenset()) -> None:
         self.app = app
         self.settings = settings
         self.extra_hosts = extra_hosts
+        self.internal_hosts = frozenset(
+            h.strip().lower() for h in settings.internal_service_hosts.split(",") if h.strip()
+        )
+
+    def _is_private_internal_call(self, scope: Scope, host_header: str) -> bool:
+        if scope.get("path") not in INTERNAL_CALL_PATHS or scope.get("method") not in ("GET", "HEAD"):
+            return False
+        name, sep, port = host_header.strip().lower().partition(":")
+        if name not in self.internal_hosts or (sep and not port.isdigit()):
+            return False
+        client = scope.get("client")
+        try:
+            peer = ipaddress.ip_address(client[0]) if client else None
+        except ValueError:
+            return False
+        if peer is None:
+            return False
+        return peer.is_loopback or any(peer in net for net in self.settings.trusted_proxy_networks)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
         hosts = [value.decode("latin-1") for name, value in scope.get("headers", []) if name == b"host"]
+        if len(hosts) == 1 and self._is_private_internal_call(scope, hosts[0]):
+            await self.app(scope, receive, send)
+            return
         if len(hosts) != 1 or not is_allowed_request_host(
             hosts[0], base_domain=self.settings.base_domain, extra=self.extra_hosts
         ):

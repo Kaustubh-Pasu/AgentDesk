@@ -34,6 +34,7 @@ def args(**overrides: object) -> argparse.Namespace:
         "gddy_dns": False,
         "zone": "",
         "yes": False,
+        "skip_preflight": False,
         "timeout": 1.0,
     }
     return argparse.Namespace(**{**base, **overrides})
@@ -131,6 +132,32 @@ async def test_refuses_when_public_endpoints_are_down(go_live, capsys) -> None: 
     assert await module.main_async(args()) == module.EXIT_FAILED
     assert not any(r.url.path == "/v1/agents/register" for r in fake.requests)
     assert "Nothing was registered" in capsys.readouterr().out
+
+
+async def test_skip_preflight_is_explicit_opt_in_and_is_announced(go_live, capsys) -> None:  # type: ignore[no-untyped-def]
+    """--skip-preflight exists for hosts that cannot reach their own public name (hairpin NAT).
+    It must be an explicit operator choice, must be visible in the output, and must never be the default."""
+    module, fake, tmp_path, public_ok = go_live
+    await seed(tmp_path)
+    public_ok["value"] = False  # the in-container check would fail …
+    assert await module.main_async(args(skip_preflight=True)) == module.EXIT_ACTION_REQUIRED
+    out = capsys.readouterr().out
+    assert "Public preflight skipped" in out  # … and the operator's override is on the record
+    assert sum(r.url.path == "/v1/agents/register" for r in fake.requests) == 1
+    assert "ACTIVE ✔" not in out  # skipping a preflight never shortcuts the registry's own validation
+
+
+def test_skip_preflight_defaults_to_off(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    module = load_script()
+    captured: dict[str, object] = {}
+
+    async def fake_main(parsed):  # type: ignore[no-untyped-def]
+        captured["skip"] = parsed.skip_preflight
+        return 0
+
+    monkeypatch.setattr(module, "main_async", fake_main)
+    monkeypatch.setattr("sys.argv", ["ans_register.py", "--host", HOST])
+    assert module.main() == 0 and captured["skip"] is False
 
 
 async def test_bad_credential_is_reported_without_echoing_it(go_live, monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
