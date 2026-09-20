@@ -191,3 +191,65 @@ class LoopbackRemoteHttp(RemoteHttp):
         validate_url(url, REMOTE_AGENT_URL_POLICY)  # the production policy still applies to the ORIGINAL url
         parts = urlsplit(url)
         return await super()._request(method, f"http://{parts.hostname}:{self._port}{parts.path or '/'}", **kwargs)  # type: ignore[arg-type]
+
+
+@contextlib.asynccontextmanager
+async def run_lifespan(app: object) -> AsyncIterator[None]:
+    """Drive ASGI lifespan startup/shutdown in ONE background task (anyio task-group affinity)."""
+    to_app: asyncio.Queue[dict[str, str]] = asyncio.Queue()
+    started, stopped = asyncio.Event(), asyncio.Event()
+    failure: list[str] = []
+
+    async def receive() -> dict[str, str]:
+        return await to_app.get()
+
+    async def send(message: dict[str, str]) -> None:
+        if message["type"].endswith("failed"):
+            failure.append(message.get("message", "lifespan failed"))
+        if message["type"].startswith("lifespan.startup"):
+            started.set()
+        elif message["type"].startswith("lifespan.shutdown"):
+            stopped.set()
+
+    task = asyncio.create_task(app({"type": "lifespan", "asgi": {"version": "3.0"}}, receive, send))  # type: ignore[operator]
+    await to_app.put({"type": "lifespan.startup"})
+    await asyncio.wait({asyncio.create_task(started.wait()), task}, return_when=asyncio.FIRST_COMPLETED)
+    assert started.is_set() and not failure, failure or "lifespan task exited early"
+    try:
+        yield
+    finally:
+        await to_app.put({"type": "lifespan.shutdown"})
+        await asyncio.wait({asyncio.create_task(stopped.wait()), task}, return_when=asyncio.FIRST_COMPLETED)
+        await task
+
+
+class InProcessRemoteHttp(RemoteHttp):
+    """Network-edge double for full-app tests: ``https://<our host>/…`` is answered by the ASGI app in-process.
+    The production URL policy is still applied to the requested URL first."""
+
+    def __init__(self, settings: Settings) -> None:
+        super().__init__(settings)
+        self.app: object = None
+        self.requests: list[tuple[str, str, dict[str, str]]] = []
+
+    async def _request(self, method: str, url: str, *, headers: dict[str, str], body: bytes | None, max_bytes: int,  # type: ignore[override]
+                       accept: tuple[str, ...], expect_body: bool = True):  # type: ignore[no-untyped-def]
+        import httpx
+
+        from app.protocols.remote_http import RemoteProtocolError
+        from app.security.breakers import Feature, require
+
+        require(self._settings, Feature.REMOTE_AGENT_CALLS)
+        validate_url(url, REMOTE_AGENT_URL_POLICY)
+        self.requests.append((method, url, dict(headers)))
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app, client=("198.51.100.7", 4444))) as client:  # type: ignore[arg-type]
+            response = await client.request(method, url, headers=headers, content=body)
+        if not expect_body and response.status_code in (200, 202, 204):
+            return response, b""
+        if response.status_code != 200:
+            raise RemoteProtocolError("http_status", f"HTTP {response.status_code}")
+        if response.headers.get("content-type", "").split(";")[0].strip().lower() not in accept:
+            raise RemoteProtocolError("content_type_not_allowed")
+        if len(response.content) > max_bytes:
+            raise RemoteProtocolError("response_too_large")
+        return response, response.content

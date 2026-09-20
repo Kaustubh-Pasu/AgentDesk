@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Agent Desk{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">Agent Desk</a>
+  <nav>
+    <a href="/create">Create</a>
+    <a href="/find">Find</a>
+    <a href="/proof">Proof</a>
+    <a href="/security">Security</a>
+    {% if principal %}
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ principal.session.csrf_token }}">
+      <button class="link" type="submit">Sign out</button>
+    </form>
+    {% else %}<a href="/login">Sign in</a>{% endif %}
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer>
+  <span>discover → verify → communicate</span>
+  <span class="muted">ANS environment: {{ settings_view.environment }} · request {{ correlation_id }}</span>
+</footer>
+</body>
+</html>

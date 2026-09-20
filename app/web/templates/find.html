@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge %}
+{% block title %}Find agent · Agent Desk{% endblock %}
+{% block content %}
+<h1>Find agent</h1>
+<form method="post" action="/find" class="stack">
+  <label>What capability do you need? <input name="query" required minlength="2" maxlength="300" value="{{ form.query }}" placeholder="a coffee shop agent that knows opening hours"></label>
+  <label>…or an exact agent hostname (optional) <input name="exact_host" maxlength="253" value="{{ form.exact_host }}" placeholder="{{ settings_view.demo_host }}"></label>
+  <label>Question for the verified agent (optional, read-only) <input name="question" maxlength="500" value="{{ form.question }}" placeholder="When are you open on Saturday?"></label>
+  <button type="submit">Discover → verify → communicate</button>
+</form>
+{% if outcome %}
+<h2>Steps</h2>
+<ol>{% for step in outcome.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+{% if outcome.error %}<p class="alert">{{ outcome.error }}</p>{% endif %}
+<p class="muted">Intent tags: {{ outcome.intent.tags|join(", ") }} · keywords: {{ outcome.intent.keywords|join(", ") }}</p>
+{% for c in outcome.candidates %}
+<article class="candidate">
+  <h3>{{ c.display_name or c.agent_host }} {{ badge(c.decision) }}</h3>
+  <p><code>{{ c.agent_host }}</code> · {{ c.ans_name or "no ANS name" }} · ANS status {{ c.ans_status or "n/a" }}
+     {% if c.trust_score is not none %}· trust score {{ c.trust_score }} <span class="muted">(informational only)</span>{% endif %}</p>
+  {% if c.checks %}
+  <details {% if not c.verified %}open{% endif %}><summary>{{ c.checks|length }} verification checks</summary>
+  <table><tbody>{% for k in c.checks %}
+    <tr><td>{{ badge(k.status) }}</td><td>{{ k.label }}{% if not k.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td class="muted">{{ k.detail }}</td></tr>
+  {% endfor %}</tbody></table></details>
+  {% endif %}
+</article>
+{% endfor %}
+{% if outcome.remote_reply %}
+<h2>Reply from {{ outcome.chosen }} <span class="muted">via {{ outcome.remote_reply.protocol }}</span></h2>
+<blockquote class="untrusted"><strong>Untrusted remote content — shown as text only.</strong>
+<pre>{{ outcome.remote_reply.text }}</pre></blockquote>
+{% endif %}
+{% endif %}
+{% endblock %}

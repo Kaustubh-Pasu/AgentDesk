@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge %}
+{% block title %}Proof · {{ proof.agent_host }}{% endblock %}
+{% block content %}
+<h1>Proof for <code>{{ proof.agent_host }}</code> {{ badge(proof.decision) }}</h1>
+<p class="muted">Generated {{ proof.generated_at }} from live checks{% if proof.cached %} (cached for a few seconds){% endif %}. ANS environment: {{ proof.environment }}.
+   <a href="/api/proof">JSON</a></p>
+<section class="gates">
+{% for g in proof.gates %}
+  <article class="gate">
+    <h2>Gate {{ g.gate }} · {{ g.title }} {{ badge(g.status) }}</h2>
+    <p>{{ g.detail }}</p>
+    {% if g.evidence %}<dl>{% for k, v in g.evidence.items() %}<dt>{{ k }}</dt><dd><code>{{ v if v is string else v|tojson }}</code></dd>{% endfor %}</dl>{% endif %}
+  </article>
+{% endfor %}
+</section>
+<h2>Verification checklist</h2>
+<table><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>
+{% for c in proof.verification.checks %}
+  <tr><td>{{ badge(c.status) }}</td><td>{{ c.label }}{% if not c.mandatory %} <span class="muted">(optional)</span>{% endif %}</td><td class="muted">{{ c.detail }}</td></tr>
+{% endfor %}</tbody></table>
+{% if proof.verification.identity_certificate %}
+{% set cert = proof.verification.identity_certificate %}
+<h2>ANS identity certificate (public)</h2>
+<dl><dt>Subject</dt><dd><code>{{ cert.subject }}</code></dd><dt>Issuer</dt><dd><code>{{ cert.issuer }}</code></dd>
+<dt>SAN</dt><dd><code>{{ cert.san|join(", ") }}</code></dd><dt>Serial</dt><dd><code>{{ cert.serial }}</code></dd>
+<dt>SHA-256</dt><dd><code>{{ cert.sha256 }}</code></dd><dt>Valid</dt><dd>{{ cert.valid_from }} → {{ cert.valid_to }}</dd>
+<dt>Chain</dt><dd>{{ badge(cert.chain_status) }} {{ cert.chain_reason }}</dd><dt>Binding</dt><dd>{{ badge(cert.binding_status) }} {{ cert.binding_reason }}</dd></dl>
+{% endif %}
+<ul class="plain muted">{% for n in proof.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+{% endblock %}

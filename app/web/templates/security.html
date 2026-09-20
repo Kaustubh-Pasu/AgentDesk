@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Security · Agent Desk{% endblock %}
+{% block content %}
+<h1>Security model</h1>
+<p>No system is unhackable. These are the controls this deployment actually enforces; details are in <code>SECURITY.md</code>.</p>
+<ul>
+  <li><strong>Website import is an SSRF boundary:</strong> https/443 only, no IP literals, every DNS answer must be globally routable, the validated
+      address is the one connected to (no rebinding), redirects re-validated, strict size/time/page limits, isolated secret-less scraper.</li>
+  <li><strong>Prompt injection is contained by privilege, not wording:</strong> the extraction model has no tools, network or secrets and can only
+      emit a strictly validated profile that the owner must confirm.</li>
+  <li><strong>No generated code:</strong> one prewritten runtime serves every agent from validated data. All public A2A/MCP skills are read-only.
+      Payments, bookings and orders are unsupported and fail closed.</li>
+  <li><strong>ANS identity ≠ trust:</strong> only agents passing the 15-point checklist are contacted; replies are shown as untrusted text and can
+      never trigger a local action. Tokens are never forwarded.</li>
+  <li><strong>Browser security:</strong> opaque <code>__Host-</code> sessions, per-session CSRF + Origin/Fetch-Metadata checks, strict CSP without inline
+      script, autoescaped templates, owner-scoped queries, idempotent mutations.</li>
+  <li><strong>Secrets:</strong> the GoDaddy credential and ANS private keys live only in the private control plane; logs and proof bundles are redacted
+      and scanned before export.</li>
+</ul>
+<h2>Circuit breakers</h2>
+<table><tbody>{% for name, enabled in breakers.items() %}<tr><td><code>{{ name }}</code></td><td>{{ "enabled" if enabled else "DISABLED" }}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

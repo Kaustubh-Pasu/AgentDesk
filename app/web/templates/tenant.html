@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.display_name }} · Agent Desk{% endblock %}
+{% block content %}
+<p><a href="/create">← all agents</a></p>
+<h1>{{ tenant.display_name }} <span class="state">{{ tenant.state.value }}</span></h1>
+<p>Host <code>{{ tenant.agent_host }}</code> · source <code>{{ tenant.source_domain }}</code> · published version {{ tenant.current_version or "none" }}</p>
+
+<h2>1 · Imported facts {% if has_draft %}<span class="state">DRAFT — not public until you confirm</span>{% endif %}</h2>
+{% if form %}
+<form method="post" action="/admin/tenants/{{ tenant.id }}/publish" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="idempotency_key" value="{{ keys[0] }}">
+  <input type="hidden" name="row_version" value="{{ tenant.row_version }}">
+  <label>Business name <input name="business_name" required maxlength="120" value="{{ form.business_name }}"></label>
+  <label>Description <textarea name="description" rows="3" maxlength="1200">{{ form.description }}</textarea></label>
+  <label>Category <select name="category">{% for c in categories %}<option value="{{ c }}" {% if c == form.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+  <label>Address <input name="address" maxlength="300" value="{{ form.address }}"></label>
+  <label>Public phone <input name="phone" maxlength="40" value="{{ form.phone }}"></label>
+  <label>Public email <input name="email" maxlength="254" value="{{ form.email }}"></label>
+  <label>Hours — one per line: <code>days | hours</code><textarea name="hours" rows="4">{{ form.hours }}</textarea></label>
+  <label>Services — <code>name | description | price</code><textarea name="services" rows="4">{{ form.services }}</textarea></label>
+  <label>Menu — <code>name | description | price | section</code><textarea name="menu_items" rows="5">{{ form.menu_items }}</textarea></label>
+  <label>FAQ — <code>question | answer</code><textarea name="faq" rows="4">{{ form.faq }}</textarea></label>
+  <fieldset><legend>Capabilities (read-only; fixed allowlist)</legend>
+    {% for c in capabilities %}<label class="check"><input type="checkbox" name="capabilities" value="{{ c }}" {% if c in selected %}checked{% endif %}> {{ c }}</label>{% endfor %}
+  </fieldset>
+  {% if has_draft %}
+  <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed these facts and confirm they are accurate public information about my business.</label>
+  <button type="submit">Confirm &amp; publish</button>
+  {% else %}<p class="muted">This version is published and immutable. Import again to prepare a new version.</p>{% endif %}
+</form>
+{% else %}<p class="muted">Nothing imported yet, or the last import failed safely.</p>{% endif %}
+<form method="post" action="/admin/tenants/{{ tenant.id }}/import" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[1] }}">
+  <button type="submit" class="secondary">Import website again</button>
+</form>
+
+<h2>2 · Public endpoints</h2>
+{% if published %}
+<ul class="plain">
+  <li>Agent Card <a href="{{ origin }}/.well-known/agent-card.json"><code>{{ origin }}/.well-known/agent-card.json</code></a></li>
+  <li>A2A <code>{{ origin }}/a2a</code> · MCP <code>{{ origin }}/mcp</code> · <a href="{{ origin }}/proof">proof</a></li>
+</ul>
+{% else %}<p class="muted">Not published.</p>{% endif %}
+
+<h2>3 · GoDaddy ANS registration <span class="muted">({{ environment }})</span></h2>
+{% if not ans_configured %}<p class="alert">No GoDaddy ANS credential is configured on this deployment. Registration is WAITING_FOR_EXTERNAL_INPUT.</p>{% endif %}
+{% if registration %}
+<p>Status reported by GoDaddy: <span class="state">{{ registration.status }}</span>
+   {% if registration.ans_name %}· <code>{{ registration.ans_name }}</code>{% endif %}
+   {% if registration.agent_id %}· agentId <code>{{ registration.agent_id }}</code>{% endif %}
+   {% if registration.last_checked_at %}· checked {{ registration.last_checked_at.isoformat() }}{% endif %}
+   {% if registration.last_error %}· last error <code>{{ registration.last_error }}</code>{% endif %}</p>
+{% if registration.challenge %}
+  {% for group, title in (("acme", "ACME DNS-01 challenge — publish, then Verify ACME"), ("dns", "ANS DNS records — publish, then Verify DNS")) %}
+  {% if registration.challenge.get(group) %}
+  <h3>{{ title }}</h3>
+  <table><thead><tr><th>Name</th><th>Type</th><th>Value</th><th>TTL</th></tr></thead><tbody>
+  {% for r in registration.challenge.get(group) %}<tr><td><code>{{ r.name }}</code></td><td>{{ r.type }}</td><td><code>{{ r.value }}</code></td><td>{{ r.ttl }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}{% endfor %}
+{% endif %}
+{% else %}<p class="muted">Not submitted.</p>{% endif %}
+<div class="row">
+{% for step, label in (("submit", "Register with ANS"), ("verify_acme", "Verify ACME"), ("verify_dns", "Verify DNS"), ("refresh", "Refresh live status")) %}
+<form method="post" action="/admin/tenants/{{ tenant.id }}/ans/{{ step }}" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[loop.index + 1] }}">
+  <button type="submit" class="secondary" {% if not published %}disabled{% endif %}>{{ label }}</button>
+</form>
+{% endfor %}
+</div>
+<p class="muted">The status above is copied from the live GoDaddy response. It is never set to ACTIVE locally. DNS records are created by you
+   (or by the operator script), never by this web application.</p>
+
+<h2>Danger zone</h2>
+<form method="post" action="/admin/tenants/{{ tenant.id }}/disable" class="stack narrow">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ keys[6] }}">
+  <label>Password (re-authentication) <input type="password" name="password" maxlength="256" autocomplete="current-password"></label>
+  <button type="submit" class="danger">Disable agent</button>
+</form>
+{% endblock %}

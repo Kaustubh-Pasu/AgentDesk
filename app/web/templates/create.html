@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Create agent · Agent Desk{% endblock %}
+{% block content %}
+<h1>Create agent</h1>
+<ol class="steps"><li>Import website</li><li>Review &amp; confirm facts</li><li>Publish on A2A + MCP</li><li>Register with GoDaddy ANS</li></ol>
+<form method="post" action="/admin/tenants" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+  <label>Business name <input name="display_name" required maxlength="120"></label>
+  <label>Public website (https) <input type="url" name="source_url" required maxlength="2048" placeholder="https://www.example-cafe.com/"></label>
+  <label>Agent subdomain
+    <span class="row"><input name="agent_label" required maxlength="63" pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="cafe"><code>.{{ base_domain }}</code></span>
+  </label>
+  <button type="submit">Import website</button>
+</form>
+<p class="muted">Importing a page does not prove you own it. Only public text is read (no JavaScript, files or logins),
+   and nothing is published until you confirm the extracted facts.</p>
+<h2>Your agents</h2>
+{% if tenants %}
+<table>
+  <thead><tr><th>Agent</th><th>Host</th><th>State</th><th>Version</th></tr></thead>
+  <tbody>{% for t in tenants %}
+    <tr><td><a href="/admin/tenants/{{ t.id }}">{{ t.display_name }}</a></td><td><code>{{ t.agent_host }}</code></td>
+        <td><span class="state">{{ t.state.value }}</span></td><td>{{ t.current_version or "—" }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">No agents yet.</p>{% endif %}
+{% endblock %}

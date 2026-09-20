@@ -25,7 +25,7 @@ BASE_HEADERS: dict[str, str] = {
     "X-Frame-Options": "DENY",
 }
 
-_NO_STORE_PREFIXES = ("/admin", "/login", "/logout", "/api/")
+_NO_STORE_PREFIXES = ("/admin", "/create", "/login", "/logout", "/api/")
 
 
 class SecurityHeadersMiddleware:

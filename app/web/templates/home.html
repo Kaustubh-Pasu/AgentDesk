@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Turn a website into a verified, discoverable AI agent.</h1>
+  <p>Agent Desk turns controlled websites into verified, discoverable AI agents, then helps other agents
+     discover, verify, and communicate with them — using the GoDaddy Agent Name Service, A2A and MCP.</p>
+</section>
+<section class="cards">
+  <a class="card" href="/create">
+    <h2>Create agent</h2>
+    <p>Safely import a public website, review the extracted facts, publish a read-only business agent on A2A + MCP,
+       and register it with GoDaddy ANS.</p>
+  </a>
+  <a class="card" href="/find">
+    <h2>Find agent</h2>
+    <p>Search ANS for a capability, run the 15-point verification checklist on each candidate, then ask the verified
+       agent a read-only question.</p>
+  </a>
+</section>
+<section>
+  <h2>This deployment</h2>
+  <ul class="plain">
+    <li>Agent Desk A2A card: <code>{{ settings_view.desk_origin }}/.well-known/agent-card.json</code> · MCP: <code>{{ settings_view.desk_origin }}/mcp</code></li>
+    <li>Demo business agent: <a href="{{ settings_view.demo_origin }}/">{{ settings_view.demo_host }}</a> ·
+        <a href="{{ settings_view.demo_origin }}/proof">its proof</a></li>
+    <li><a href="/proof">Live five-gate proof for this host</a></li>
+  </ul>
+</section>
+{% endblock %}
