@@ -198,7 +198,7 @@ def test_malformed_llm_json_rejected(raw: str) -> None:
         ExtractionOutput.model_validate_json(raw)
 
 
-@pytest.mark.parametrize("cap", sorted(FORBIDDEN_CAPABILITIES) + ["SHELL", "hours ", "hours;shell", ""])
+@pytest.mark.parametrize("cap", [*sorted(FORBIDDEN_CAPABILITIES), "SHELL", "hours ", "hours;shell", ""])
 def test_forbidden_or_unknown_capability_rejected(cap: str) -> None:
     payload = {"profile": {"business_name": "A"}, "capabilities": ["hours", cap]}
     if cap == "hours ":  # whitespace is not silently normalised into an allowed capability

@@ -15,7 +15,48 @@ MAX_TEXT_CHARS_TOTAL = 60_000
 MAX_JSONLD_BYTES = 64 * 1024
 
 #: Path prefixes that are never worth crawling and often hide traps or state-changing GETs.
-SKIP_PATH_PREFIXES = ("/wp-admin", "/admin", "/login", "/logout", "/cart", "/checkout", "/account", "/cgi-bin", "/api/")
-SKIP_EXTENSIONS = (".pdf", ".zip", ".gz", ".tar", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".exe", ".dmg", ".iso",
-                   ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico", ".mp3", ".mp4", ".mov", ".avi", ".css", ".js",
-                   ".json", ".xml", ".rss", ".woff", ".woff2", ".ttf")
+SKIP_PATH_PREFIXES = (
+    "/wp-admin",
+    "/admin",
+    "/login",
+    "/logout",
+    "/cart",
+    "/checkout",
+    "/account",
+    "/cgi-bin",
+    "/api/",
+)
+SKIP_EXTENSIONS = (
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".exe",
+    ".dmg",
+    ".iso",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".mp3",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".css",
+    ".js",
+    ".json",
+    ".xml",
+    ".rss",
+    ".woff",
+    ".woff2",
+    ".ttf",
+)

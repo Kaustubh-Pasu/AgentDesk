@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.agents.registry import AgentRegistry
 from app.agents.seed import seed_demo_agent
 from app.ans.certs import KeyStore
-from app.ans.client import AnsApiError, AnsClient, AnsNotConfigured, parse_timestamp
+from app.ans.client import AnsApiError, AnsClient, AnsNotConfigured, DnsRecord, parse_timestamp
 from app.ans.registration import (
     RegistrationError,
     RegistrationFlow,
@@ -18,7 +18,6 @@ from app.ans.registration import (
     allowed_dns_record,
     build_registration_payload,
 )
-from app.ans.client import DnsRecord
 from app.models.db import ANSRegistration, AuditEvent, Database, Tenant, TenantState, User
 from app.security.kv import MemoryKV
 from app.security.passwords import hash_password
@@ -36,7 +35,9 @@ async def test_bearer_and_sso_key_auth_headers(fake_ans: FakeANS, ans_settings) 
     agent_id = fake_ans.add_active_agent(DEMO_HOST)
     assert (await client_for(fake_ans, ans_settings).get_agent(agent_id)).agent_status == "ACTIVE"
     assert fake_ans.requests[-1].headers["authorization"] == f"Bearer {PAT}"
-    sso = make_settings(ans_auth_scheme="sso-key", godaddy_api_key="testkey0001", godaddy_api_secret="testsecret0001")
+    sso = make_settings(
+        ans_auth_scheme="sso-key", godaddy_api_key="testkey0001", godaddy_api_secret="testsecret0001"
+    )
     await client_for(fake_ans, sso).get_agent(agent_id)
     assert fake_ans.requests[-1].headers["authorization"] == "sso-key testkey0001:testsecret0001"
     assert fake_ans.requests[-1].url.host == "api.godaddy.com"
@@ -62,17 +63,24 @@ async def test_public_discovery_sends_no_credential(fake_ans: FakeANS, ans_setti
     fake_ans.add_active_agent("cafe.example.org", name="Cafe")
     fake_ans.add_active_agent("gone.example.org", status="REVOKED")
     hits = await client_for(fake_ans, ans_settings).discover(query="coffee")
-    assert [h.agent_host for h in hits] == ["cafe.example.org"] and hits[0].version == "1.0.0" and hits[0].status == "ACTIVE"
+    assert (
+        [h.agent_host for h in hits] == ["cafe.example.org"]
+        and hits[0].version == "1.0.0"
+        and hits[0].status == "ACTIVE"
+    )
     assert "authorization" not in fake_ans.requests[-1].headers
 
 
 async def test_redirect_is_not_followed_and_errors_are_lenient(fake_ans: FakeANS, ans_settings) -> None:  # type: ignore[no-untyped-def]
     client = client_for(fake_ans, ans_settings)
-    for response, code in [(httpx.Response(302, headers={"location": "https://evil.example/steal"}), "UNAUTHENTICATED_REDIRECT"),
-                           (httpx.Response(401), "HTTP_401"), (httpx.Response(400, content=b"<html>oops"), "HTTP_400"),
-                           (httpx.Response(403, json={"code": "ACCESS_DENIED", "message": "scope"}), "ACCESS_DENIED"),
-                           (httpx.Response(200, content=b"{not json"), "INVALID_JSON"),
-                           (httpx.Response(200, json={"unexpected": True}), "UNEXPECTED_RESPONSE_SHAPE")]:
+    for response, code in [
+        (httpx.Response(302, headers={"location": "https://evil.example/steal"}), "UNAUTHENTICATED_REDIRECT"),
+        (httpx.Response(401), "HTTP_401"),
+        (httpx.Response(400, content=b"<html>oops"), "HTTP_400"),
+        (httpx.Response(403, json={"code": "ACCESS_DENIED", "message": "scope"}), "ACCESS_DENIED"),
+        (httpx.Response(200, content=b"{not json"), "INVALID_JSON"),
+        (httpx.Response(200, json={"unexpected": True}), "UNEXPECTED_RESPONSE_SHAPE"),
+    ]:
         fake_ans.fail_next = [response]
         with pytest.raises(AnsApiError) as excinfo:
             await client.get_agent("550e8400-e29b-41d4-a716-446655440000")
@@ -122,7 +130,9 @@ async def test_revocation_reason_allow_list(fake_ans: FakeANS, ans_settings) -> 
 async def make_flow(db: Database, fake: FakeANS, settings):  # type: ignore[no-untyped-def]
     await seed_demo_agent(db, settings)
     registry = AgentRegistry(db, settings, ttl_s=0)
-    flow = RegistrationFlow(client_for(fake, settings), KeyStore(settings.keys_path, TEST_BASE_DOMAIN), settings)
+    flow = RegistrationFlow(
+        client_for(fake, settings), KeyStore(settings.keys_path, TEST_BASE_DOMAIN), settings
+    )
     return registry, flow
 
 
@@ -132,11 +142,20 @@ async def test_registration_payload_matches_contract(db: Database, fake_ans: Fak
     assert agent is not None
     csrs = KeyStore(ans_settings.keys_path, TEST_BASE_DOMAIN).csr_bundle(DEMO_HOST, "1.0.0")
     payload = build_registration_payload(agent, ans_settings, csrs)
-    assert payload["agentHost"] == DEMO_HOST and payload["version"] == "1.0.0" and len(payload["agentDisplayName"]) <= 64
+    assert (
+        payload["agentHost"] == DEMO_HOST
+        and payload["version"] == "1.0.0"
+        and len(payload["agentDisplayName"]) <= 64
+    )
     assert {e["protocol"] for e in payload["endpoints"]} == {"A2A", "MCP"}
     for endpoint in payload["endpoints"]:
-        assert endpoint["agentUrl"].startswith(f"https://{DEMO_HOST}/") and endpoint["metaDataUrl"].startswith("https://")
-        assert all(len(f["id"]) <= 64 and len(f["tags"]) <= 5 and all(len(t) <= 20 for t in f["tags"]) for f in endpoint["functions"])
+        assert endpoint["agentUrl"].startswith(f"https://{DEMO_HOST}/") and endpoint[
+            "metaDataUrl"
+        ].startswith("https://")
+        assert all(
+            len(f["id"]) <= 64 and len(f["tags"]) <= 5 and all(len(t) <= 20 for t in f["tags"])
+            for f in endpoint["functions"]
+        )
     assert payload["endpoints"][1]["transports"] == ["STREAMABLE-HTTP"]
     assert payload["identityCsrPEM"].startswith("-----BEGIN CERTIFICATE REQUEST-----")
     assert "PRIVATE KEY" not in json.dumps(payload)
@@ -150,14 +169,26 @@ async def test_full_flow_to_active(db: Database, ans_settings, singular: bool) -
     assert agent is not None
     snap = await flow.submit(agent)
     assert snap.status == "PENDING_VALIDATION" and snap.environment == "production" and not snap.active
-    assert snap.acme_records == [{"name": f"_acme-challenge.{DEMO_HOST}", "type": "TXT", "value": "acme-value-123",
-                                  "ttl": 3600, "required": True, "purpose": ""}]
+    assert snap.acme_records == [
+        {
+            "name": f"_acme-challenge.{DEMO_HOST}",
+            "type": "TXT",
+            "value": "acme-value-123",
+            "ttl": 3600,
+            "required": True,
+            "purpose": "",
+        }
+    ]
     assert snap.next_action == "publish_acme_txt_then_verify_acme"
     assert "SECRETISH" not in json.dumps(snap.to_public_dict())  # ACME token/keyAuthorization never kept
 
     snap = await flow.trigger_acme(snap.agent_id, DEMO_HOST, "1.0.0")  # type: ignore[arg-type]
     assert snap.status == "PENDING_DNS" and snap.next_action == "publish_dns_records_then_verify_dns"
-    assert {r["name"] for r in snap.dns_records} == {f"_ans.{DEMO_HOST}", f"_ans-badge.{DEMO_HOST}", f"_443._tcp.{DEMO_HOST}"}
+    assert {r["name"] for r in snap.dns_records} == {
+        f"_ans.{DEMO_HOST}",
+        f"_ans-badge.{DEMO_HOST}",
+        f"_443._tcp.{DEMO_HOST}",
+    }
     assert [r["name"] for r in snap.rejected_records] == ["unrelated.victim.example"]
 
     fake.dns_ok = False
@@ -179,7 +210,9 @@ async def test_conflict_adopts_only_our_own_record(db: Database, fake_ans: FakeA
     again = await flow.submit(agent)  # 409 → recovered through the authenticated search
     assert again.agent_id == first.agent_id and again.status == "PENDING_VALIDATION"
     fake_ans.agents[first.agent_id]["agentHost"] = "someone-else.example.org"  # type: ignore[index]
-    fake_ans.fail_next = [httpx.Response(409, json={"code": "ANS_NAME_TAKEN", "message": "x", "status": "ERROR"})]
+    fake_ans.fail_next = [
+        httpx.Response(409, json={"code": "ANS_NAME_TAKEN", "message": "x", "status": "ERROR"})
+    ]
     with pytest.raises(RegistrationError, match="already registered"):
         await flow.submit(agent)
 
@@ -198,18 +231,28 @@ def test_dns_record_policy_is_exact_name() -> None:
     assert allowed_dns_record(rec(f"_ANS.{DEMO_HOST}."), DEMO_HOST)
     assert allowed_dns_record(rec(f"_443._tcp.{DEMO_HOST}", "TLSA"), DEMO_HOST)
     assert allowed_dns_record(rec(DEMO_HOST, "HTTPS"), DEMO_HOST)
-    for name, rtype in [(DEMO_HOST, "TXT"), (f"_ans.evil.{TEST_BASE_DOMAIN}", "TXT"), (TEST_BASE_DOMAIN, "TXT"),
-                        (DEMO_HOST, "A"), (f"www.{DEMO_HOST}", "CNAME"), (f"_ans.{DEMO_HOST}.evil.com", "TXT")]:
+    for name, rtype in [
+        (DEMO_HOST, "TXT"),
+        (f"_ans.evil.{TEST_BASE_DOMAIN}", "TXT"),
+        (TEST_BASE_DOMAIN, "TXT"),
+        (DEMO_HOST, "A"),
+        (f"www.{DEMO_HOST}", "CNAME"),
+        (f"_ans.{DEMO_HOST}.evil.com", "TXT"),
+    ]:
         assert not allowed_dns_record(rec(name, rtype), DEMO_HOST)
 
 
 # --------------------------------------------------------------------------- DB-backed service
-async def test_service_persists_only_live_status_and_is_owner_scoped(db: Database, fake_ans: FakeANS, ans_settings, caplog) -> None:  # type: ignore[no-untyped-def]
+async def test_service_persists_only_live_status_and_is_owner_scoped(
+    db: Database, fake_ans: FakeANS, ans_settings, caplog
+) -> None:  # type: ignore[no-untyped-def]
     registry, flow = await make_flow(db, fake_ans, ans_settings)
     service = RegistrationService(db, flow, registry, MemoryKV(), ans_settings)
     async with db.session() as session:
         tenant = (await session.execute(select(Tenant))).scalar_one()
-        intruder = User(email="intruder@example.org", password_hash=hash_password("correct horse battery staple"))
+        intruder = User(
+            email="intruder@example.org", password_hash=hash_password("correct horse battery staple")
+        )
         session.add(intruder)
         await session.commit()
     with pytest.raises(RegistrationError, match="not_found"):
@@ -221,7 +264,11 @@ async def test_service_persists_only_live_status_and_is_owner_scoped(db: Databas
     assert PAT not in caplog.text and "PRIVATE KEY" not in caplog.text
     async with db.session() as session:
         row = (await session.execute(select(ANSRegistration))).scalar_one()
-        assert row.status == "PENDING_VALIDATION" and row.agent_id == snap.agent_id and row.environment == "production"
+        assert (
+            row.status == "PENDING_VALIDATION"
+            and row.agent_id == snap.agent_id
+            and row.environment == "production"
+        )
         assert "SECRETISH" not in json.dumps(row.challenge)
         assert (await session.execute(select(Tenant))).scalar_one().state is TenantState.PENDING_VALIDATION
     with pytest.raises(RegistrationError, match="already registered"):
@@ -233,7 +280,9 @@ async def test_service_persists_only_live_status_and_is_owner_scoped(db: Databas
         await service.advance(tenant.id, tenant.owner_id, "verify_dns")
     async with db.session() as session:
         row = (await session.execute(select(ANSRegistration))).scalar_one()
-        assert row.status == "PENDING_DNS" and row.last_error == "VALIDATION_ERROR"  # failure never became ACTIVE
+        assert (
+            row.status == "PENDING_DNS" and row.last_error == "VALIDATION_ERROR"
+        )  # failure never became ACTIVE
     fake_ans.dns_ok = True
     assert (await service.advance(tenant.id, tenant.owner_id, "verify_dns")).active
     async with db.session() as session:

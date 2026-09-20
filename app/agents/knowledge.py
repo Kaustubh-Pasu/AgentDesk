@@ -16,7 +16,52 @@ MAX_QUESTION_CHARS = 500
 
 _WORD = re.compile(r"[a-z0-9']+")
 _STOPWORDS = frozenset(
-    ["a", "an", "and", "are", "at", "be", "by", "can", "do", "does", "for", "from", "have", "how", "i", "in", "is", "it", "me", "my", "of", "on", "or", "our", "the", "to", "us", "was", "what", "when", "where", "which", "who", "will", "with", "you", "your", "please", "tell", "about", "any", "there", "this", "that"]
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "at",
+        "be",
+        "by",
+        "can",
+        "do",
+        "does",
+        "for",
+        "from",
+        "have",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "me",
+        "my",
+        "of",
+        "on",
+        "or",
+        "our",
+        "the",
+        "to",
+        "us",
+        "was",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "will",
+        "with",
+        "you",
+        "your",
+        "please",
+        "tell",
+        "about",
+        "any",
+        "there",
+        "this",
+        "that",
+    ]
 )
 
 _INTENT_KEYWORDS: dict[Capability, tuple[str, ...]] = {
@@ -90,7 +135,29 @@ _INTENT_KEYWORDS: dict[Capability, tuple[str, ...]] = {
 
 #: Anything that smells like a transaction is outside the MVP and fails closed (spec §36).
 _TRANSACTION_WORDS = frozenset(
-    ["pay", "payment", "purchase", "buy", "order", "checkout", "book", "booking", "reserve", "reservation", "refund", "charge", "invoice", "transfer", "wire", "mandate", "settle", "settlement", "x402", "ap2", "quote"]
+    [
+        "pay",
+        "payment",
+        "purchase",
+        "buy",
+        "order",
+        "checkout",
+        "book",
+        "booking",
+        "reserve",
+        "reservation",
+        "refund",
+        "charge",
+        "invoice",
+        "transfer",
+        "wire",
+        "mandate",
+        "settle",
+        "settlement",
+        "x402",
+        "ap2",
+        "quote",
+    ]
 )
 
 UNSUPPORTED_TRANSACTION_TEXT = (

@@ -95,12 +95,12 @@ async def revoke_all(db: AsyncSession, user_id: uuid.UUID, *, except_session: uu
     if except_session is not None:
         stmt = stmt.where(UserSession.id != except_session)
     result = await db.execute(stmt)
-    return int(result.rowcount or 0)
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
 async def purge_expired(db: AsyncSession, now: datetime | None = None) -> int:
     result = await db.execute(delete(UserSession).where(UserSession.expires_at < (now or utcnow())))
-    return int(result.rowcount or 0)
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
 def mark_reauthenticated(row: UserSession) -> None:

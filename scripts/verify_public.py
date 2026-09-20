@@ -17,19 +17,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.ans.client import AnsClient  # noqa: E402
-from app.ans.evidence import build_proof  # noqa: E402
-from app.ans.verifier import Verifier  # noqa: E402
-from app.logging_config import configure_logging  # noqa: E402
-from app.protocols.remote_http import RemoteHttp  # noqa: E402
-from app.settings import Settings  # noqa: E402
+from app.ans.client import AnsClient
+from app.ans.evidence import build_proof
+from app.ans.verifier import Verifier
+from app.logging_config import configure_logging
+from app.protocols.remote_http import RemoteHttp
+from app.settings import Settings
 
 
 async def run(hosts: list[str], as_json: bool, api_base: str) -> int:
     base_domain = hosts[0].split(".", 1)[1]
     # a secret-less, database-less settings object: this script needs no credential at all
-    settings = Settings(_env_file=None, env="development", base_domain=base_domain, desk_host=f"desk.{base_domain}",  # type: ignore[call-arg]
-                        demo_host=f"demo.{base_domain}", godaddy_api_base=api_base)
+    settings = Settings(
+        _env_file=None,
+        env="development",
+        base_domain=base_domain,
+        desk_host=f"desk.{base_domain}",
+        demo_host=f"demo.{base_domain}",
+        godaddy_api_base=api_base,
+    )
     configure_logging("ERROR")
     verifier = Verifier(settings, AnsClient(settings), RemoteHttp(settings), None)
     failed = False
@@ -41,16 +47,22 @@ async def run(hosts: list[str], as_json: bool, api_base: str) -> int:
         if as_json:
             print(json.dumps(proof, indent=2, default=str))
             continue
-        print(f"\n== {host} ==  decision: {proof['decision']}   (gate wording assumes {host} is YOUR host under BASE_DOMAIN={base_domain})")
+        print(
+            f"\n== {host} ==  decision: {proof['decision']}   (gate wording assumes {host} is YOUR host under BASE_DOMAIN={base_domain})"
+        )
         for number in sorted(gates):
-            print(f"  Gate {number} {gates[number]['status']:<10} {gates[number]['title']} — {gates[number]['detail']}")
+            print(
+                f"  Gate {number} {gates[number]['status']:<10} {gates[number]['title']} — {gates[number]['detail']}"
+            )
         for check in proof["verification"]["checks"]:
             print(f"     [{check['status']:<10}] {check['label']}: {check['detail']}")
     return 1 if failed else 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--host", action="append", required=True)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--api-base", default="https://api.godaddy.com")

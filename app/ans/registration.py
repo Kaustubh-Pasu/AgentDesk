@@ -26,7 +26,14 @@ from sqlalchemy import select
 from app.agents.registry import AgentRegistry, ServedAgent
 from app.agents.runtime import ALL_SKILLS, skills_for
 from app.ans.certs import CsrBundle, KeyStore
-from app.ans.client import TERMINAL_STATUSES, AgentDetails, AnsApiError, AnsClient, DnsRecord, RegistrationPending
+from app.ans.client import (
+    TERMINAL_STATUSES,
+    AgentDetails,
+    AnsApiError,
+    AnsClient,
+    DnsRecord,
+    RegistrationPending,
+)
 from app.logging_config import get_logger
 from app.models.db import ANSRegistration, Database, Tenant, TenantState, utcnow
 from app.models.schemas import ans_name_for
@@ -101,7 +108,9 @@ def acme_challenge_records(pending: RegistrationPending | None, agent_host: str)
         if challenge.type.upper().replace("-", "_") != "DNS_01" or record is None:
             continue
         if _fqdn(record.name) != expected or record.type.upper() != "TXT":
-            log.warning("ignoring ACME challenge outside the exact-name policy", extra={"agent_host": agent_host})
+            log.warning(
+                "ignoring ACME challenge outside the exact-name policy", extra={"agent_host": agent_host}
+            )
             continue
         out.append(record)
     return out
@@ -110,8 +119,12 @@ def acme_challenge_records(pending: RegistrationPending | None, agent_host: str)
 def allowed_dns_record(record: DnsRecord, agent_host: str) -> bool:
     """Permanent ANS records we are willing to publish: exact names under THIS host, expected types only."""
     name, rtype = _fqdn(record.name), record.type.upper()
-    txt_names = {f"_ans.{agent_host}", f"_ans-badge.{agent_host}", f"_ra-badge.{agent_host}",
-                 f"_acme-challenge.{agent_host}"}
+    txt_names = {
+        f"_ans.{agent_host}",
+        f"_ans-badge.{agent_host}",
+        f"_ra-badge.{agent_host}",
+        f"_acme-challenge.{agent_host}",
+    }
     if rtype == "TXT":
         return name in txt_names
     if rtype == "TLSA":
@@ -147,8 +160,14 @@ class RegistrationSnapshot:
 
 
 def _record_dict(record: DnsRecord) -> dict[str, Any]:
-    return {"name": _fqdn(record.name), "type": record.type.upper(), "value": record.value, "ttl": record.ttl,
-            "required": record.required, "purpose": record.purpose}
+    return {
+        "name": _fqdn(record.name),
+        "type": record.type.upper(),
+        "value": record.value,
+        "ttl": record.ttl,
+        "required": record.required,
+        "purpose": record.purpose,
+    }
 
 
 def _next_action(status: str, acme: list[Any], dns: list[Any]) -> str:
@@ -173,24 +192,45 @@ class RegistrationFlow:
         self._keystore = keystore
         self._settings = settings
 
-    def _snapshot(self, agent_host: str, version: str, *, status: str, agent_id: str | None, ans_name: str | None,
-                  pending: RegistrationPending | None, dns: list[DnsRecord]) -> RegistrationSnapshot:
+    def _snapshot(
+        self,
+        agent_host: str,
+        version: str,
+        *,
+        status: str,
+        agent_id: str | None,
+        ans_name: str | None,
+        pending: RegistrationPending | None,
+        dns: list[DnsRecord],
+    ) -> RegistrationSnapshot:
         acme = acme_challenge_records(pending, agent_host)
         good = [r for r in dns if allowed_dns_record(r, agent_host)]
         bad = [r for r in dns if not allowed_dns_record(r, agent_host)]
         return RegistrationSnapshot(
-            agent_host=agent_host, version=version, environment=self.client.environment, status=status or "UNKNOWN",
-            agent_id=agent_id, ans_name=ans_name, acme_records=[_record_dict(r) for r in acme],
-            dns_records=[_record_dict(r) for r in good], rejected_records=[_record_dict(r) for r in bad],
+            agent_host=agent_host,
+            version=version,
+            environment=self.client.environment,
+            status=status or "UNKNOWN",
+            agent_id=agent_id,
+            ans_name=ans_name,
+            acme_records=[_record_dict(r) for r in acme],
+            dns_records=[_record_dict(r) for r in good],
+            rejected_records=[_record_dict(r) for r in bad],
             next_action=_next_action(status, acme, good),
         )
 
     def _from_details(self, details: AgentDetails, agent_host: str, version: str) -> RegistrationSnapshot:
         if details.agent_host and details.agent_host.lower() != agent_host:
             raise RegistrationError("host_mismatch", "registry record belongs to a different host")
-        return self._snapshot(agent_host, version, status=details.agent_status, agent_id=details.agent_id,
-                              ans_name=details.ans_name or None, pending=details.registration_pending,
-                              dns=details.pending_dns_records())
+        return self._snapshot(
+            agent_host,
+            version,
+            status=details.agent_status,
+            agent_id=details.agent_id,
+            ans_name=details.ans_name or None,
+            pending=details.registration_pending,
+            dns=details.pending_dns_records(),
+        )
 
     async def submit(self, agent: ServedAgent) -> RegistrationSnapshot:
         csrs = self._keystore.csr_bundle(agent.host, agent.version)
@@ -203,18 +243,29 @@ class RegistrationFlow:
             # ANSName already exists: adopt it ONLY if the registry says it is ours (authenticated search).
             existing = await self.client.find_my_agent(agent.host, agent.version)
             if not existing:
-                raise RegistrationError("ans_name_taken", "this host+version is already registered; bump the version") from exc
+                raise RegistrationError(
+                    "ans_name_taken", "this host+version is already registered; bump the version"
+                ) from exc
             return self._from_details(existing[0], agent.host, agent.version)
         if not pending.agent_id:
             found = await self.client.find_my_agent(agent.host, agent.version)
             if not found:
-                raise RegistrationError("agent_id_missing", "registration accepted but no agentId could be recovered")
+                raise RegistrationError(
+                    "agent_id_missing", "registration accepted but no agentId could be recovered"
+                )
             return self._from_details(found[0], agent.host, agent.version)
         expected_name = ans_name_for(agent.host, agent.version)
         if pending.ans_name and pending.ans_name != expected_name:
             raise RegistrationError("ans_name_mismatch", "registry returned an unexpected ANS name")
-        return self._snapshot(agent.host, agent.version, status=pending.status, agent_id=pending.agent_id,
-                              ans_name=pending.ans_name or expected_name, pending=pending, dns=pending.dns_records)
+        return self._snapshot(
+            agent.host,
+            agent.version,
+            status=pending.status,
+            agent_id=pending.agent_id,
+            ans_name=pending.ans_name or expected_name,
+            pending=pending,
+            dns=pending.dns_records,
+        )
 
     async def refresh(self, agent_id: str, agent_host: str, version: str) -> RegistrationSnapshot:
         return self._from_details(await self.client.get_agent(agent_id), agent_host, version)
@@ -227,14 +278,26 @@ class RegistrationFlow:
         await self.client.verify_dns(agent_id)
         return await self.refresh(agent_id, agent_host, version)
 
-    async def poll_until(self, agent_id: str, agent_host: str, version: str, *, until: frozenset[str],
-                         timeout_s: float = 600.0, interval_s: float = 5.0) -> RegistrationSnapshot:
+    async def poll_until(
+        self,
+        agent_id: str,
+        agent_host: str,
+        version: str,
+        *,
+        until: frozenset[str],
+        timeout_s: float = 600.0,
+        interval_s: float = 5.0,
+    ) -> RegistrationSnapshot:
         """Poll live status with capped exponential backoff until it is in ``until`` or terminal, or time is up."""
         deadline = time.monotonic() + timeout_s
         delay = interval_s
         while True:
             snapshot = await self.refresh(agent_id, agent_host, version)
-            if snapshot.status in until or snapshot.status in TERMINAL_STATUSES or time.monotonic() + delay > deadline:
+            if (
+                snapshot.status in until
+                or snapshot.status in TERMINAL_STATUSES
+                or time.monotonic() + delay > deadline
+            ):
                 return snapshot
             await asyncio.sleep(delay)
             delay = min(delay * 1.5, 30.0)
@@ -254,58 +317,117 @@ def tenant_state_for(status: str, current: TenantState) -> TenantState:
 
 
 class RegistrationService:
-    def __init__(self, db: Database, flow: RegistrationFlow, registry: AgentRegistry, kv: KV, settings: Settings) -> None:
+    def __init__(
+        self, db: Database, flow: RegistrationFlow, registry: AgentRegistry, kv: KV, settings: Settings
+    ) -> None:
         self._db = db
         self._flow = flow
         self._registry = registry
         self._kv = kv
         self._settings = settings
 
-    async def _persist(self, tenant_id: uuid.UUID, snapshot: RegistrationSnapshot, *, actor_id: str, action: str) -> None:
+    async def _persist(
+        self, tenant_id: uuid.UUID, snapshot: RegistrationSnapshot, *, actor_id: str, action: str
+    ) -> None:
         async with self._db.session() as session:
             tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
-            row = (await session.execute(select(ANSRegistration).where(
-                ANSRegistration.tenant_id == tenant_id, ANSRegistration.version == snapshot.version))).scalar_one_or_none()
+            row = (
+                await session.execute(
+                    select(ANSRegistration).where(
+                        ANSRegistration.tenant_id == tenant_id, ANSRegistration.version == snapshot.version
+                    )
+                )
+            ).scalar_one_or_none()
             if row is None:
-                row = ANSRegistration(tenant_id=tenant_id, version=snapshot.version, agent_host=snapshot.agent_host)
+                row = ANSRegistration(
+                    tenant_id=tenant_id, version=snapshot.version, agent_host=snapshot.agent_host
+                )
                 session.add(row)
             previous = row.status
             row.agent_id, row.ans_name = snapshot.agent_id, snapshot.ans_name
             row.status, row.environment = snapshot.status, snapshot.environment  # verbatim from the live API
-            row.challenge = {"acme": snapshot.acme_records, "dns": snapshot.dns_records,
-                             "next_action": snapshot.next_action}
+            row.challenge = {
+                "acme": snapshot.acme_records,
+                "dns": snapshot.dns_records,
+                "next_action": snapshot.next_action,
+            }
             row.last_checked_at, row.last_error = snapshot.checked_at, None
             tenant.state = tenant_state_for(snapshot.status, tenant.state)
-            meta = {"status": snapshot.status, "previous": previous, "environment": snapshot.environment,
-                    "agent_id": snapshot.agent_id}
-            await audit.record(session, action=action, outcome="ok", actor_type="user", actor_id=actor_id,
-                               target_type="tenant", target_id=str(tenant_id), metadata=meta)
+            meta = {
+                "status": snapshot.status,
+                "previous": previous,
+                "environment": snapshot.environment,
+                "agent_id": snapshot.agent_id,
+            }
+            await audit.record(
+                session,
+                action=action,
+                outcome="ok",
+                actor_type="user",
+                actor_id=actor_id,
+                target_type="tenant",
+                target_id=str(tenant_id),
+                metadata=meta,
+            )
             if snapshot.active and previous != "ACTIVE":
-                await audit.record(session, action=audit.ANS_ACTIVE, outcome="ok", actor_type="system",
-                                   target_type="tenant", target_id=str(tenant_id), metadata=meta)
+                await audit.record(
+                    session,
+                    action=audit.ANS_ACTIVE,
+                    outcome="ok",
+                    actor_type="system",
+                    target_type="tenant",
+                    target_id=str(tenant_id),
+                    metadata=meta,
+                )
             await session.commit()
         self._registry.invalidate(snapshot.agent_host)
 
-    async def _fail(self, tenant_id: uuid.UUID, version: str, agent_host: str, code: str, actor_id: str, action: str) -> None:
+    async def _fail(
+        self, tenant_id: uuid.UUID, version: str, agent_host: str, code: str, actor_id: str, action: str
+    ) -> None:
         async with self._db.session() as session:
-            row = (await session.execute(select(ANSRegistration).where(
-                ANSRegistration.tenant_id == tenant_id, ANSRegistration.version == version))).scalar_one_or_none()
+            row = (
+                await session.execute(
+                    select(ANSRegistration).where(
+                        ANSRegistration.tenant_id == tenant_id, ANSRegistration.version == version
+                    )
+                )
+            ).scalar_one_or_none()
             if row is None:
                 row = ANSRegistration(tenant_id=tenant_id, version=version, agent_host=agent_host)
                 session.add(row)
             row.last_error, row.last_checked_at = code[:80], utcnow()
-            await audit.record(session, action=action, outcome="error", actor_type="user", actor_id=actor_id,
-                               target_type="tenant", target_id=str(tenant_id), metadata={"code": code})
+            await audit.record(
+                session,
+                action=action,
+                outcome="error",
+                actor_type="user",
+                actor_id=actor_id,
+                target_type="tenant",
+                target_id=str(tenant_id),
+                metadata={"code": code},
+            )
             await session.commit()
 
-    async def _agent_and_row(self, tenant_id: uuid.UUID, owner_id: uuid.UUID) -> tuple[ServedAgent, ANSRegistration | None]:
+    async def _agent_and_row(
+        self, tenant_id: uuid.UUID, owner_id: uuid.UUID
+    ) -> tuple[ServedAgent, ANSRegistration | None]:
         async with self._db.session() as session:
-            tenant = (await session.execute(  # owner-scoped: another owner's tenant is indistinguishable from none
-                select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id))).scalar_one_or_none()
+            tenant = (
+                await session.execute(  # owner-scoped: another owner's tenant is indistinguishable from none
+                    select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id)
+                )
+            ).scalar_one_or_none()
             if tenant is None:
                 raise RegistrationError("not_found")
-            row = (await session.execute(select(ANSRegistration).where(
-                ANSRegistration.tenant_id == tenant_id, ANSRegistration.version == tenant.current_version))).scalar_one_or_none()
+            row = (
+                await session.execute(
+                    select(ANSRegistration).where(
+                        ANSRegistration.tenant_id == tenant_id,
+                        ANSRegistration.version == tenant.current_version,
+                    )
+                )
+            ).scalar_one_or_none()
         self._registry.invalidate(tenant.agent_host)
         agent = await self._registry.resolve(tenant.agent_host)
         if agent is None:
@@ -316,14 +438,18 @@ class RegistrationService:
         require(self._settings, Feature.WRITES)
         agent, row = await self._agent_and_row(tenant_id, owner_id)
         if row is not None and row.agent_id:
-            raise RegistrationError("already_submitted", "this version is already registered; refresh instead")
+            raise RegistrationError(
+                "already_submitted", "this version is already registered; refresh instead"
+            )
         lock = f"ans:register:{tenant_id}:{agent.version}"
         if not await self._kv.set_nx(lock, 120):  # single-flight per tenant+version
             raise RegistrationError("in_progress", "a registration for this agent is already running")
         try:
             snapshot = await self._flow.submit(agent)
         except (AnsApiError, RegistrationError) as exc:
-            await self._fail(tenant_id, agent.version, agent.host, exc.code, str(owner_id), audit.ANS_REGISTER)
+            await self._fail(
+                tenant_id, agent.version, agent.host, exc.code, str(owner_id), audit.ANS_REGISTER
+            )
             raise
         finally:
             await self._kv.delete(lock)
@@ -339,8 +465,11 @@ class RegistrationService:
             raise RegistrationError("step_invalid")
         if step != "refresh":
             require(self._settings, Feature.WRITES)
-        call = {"refresh": self._flow.refresh, "verify_acme": self._flow.trigger_acme,
-                "verify_dns": self._flow.trigger_dns}[step]
+        call = {
+            "refresh": self._flow.refresh,
+            "verify_acme": self._flow.trigger_acme,
+            "verify_dns": self._flow.trigger_dns,
+        }[step]
         action = audit.ANS_STATUS_CHANGE if step == "refresh" else audit.ANS_DNS_VALIDATION
         try:
             snapshot = await call(row.agent_id, agent.host, agent.version)

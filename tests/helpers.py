@@ -13,7 +13,6 @@ import gzip
 import ipaddress
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
-
 from urllib.parse import urlsplit
 
 from app.protocols.remote_http import RemoteHttp
@@ -136,10 +135,8 @@ class TinyServer:
             pass
         finally:
             writer.close()
-            try:
+            with contextlib.suppress(ConnectionError):
                 await writer.wait_closed()
-            except ConnectionError:
-                pass
 
 
 def gzip_bomb(decompressed_size: int) -> bytes:
@@ -190,7 +187,9 @@ class LoopbackRemoteHttp(RemoteHttp):
     async def _request(self, method: str, url: str, **kwargs: object):  # type: ignore[no-untyped-def,override]
         validate_url(url, REMOTE_AGENT_URL_POLICY)  # the production policy still applies to the ORIGINAL url
         parts = urlsplit(url)
-        return await super()._request(method, f"http://{parts.hostname}:{self._port}{parts.path or '/'}", **kwargs)  # type: ignore[arg-type]
+        return await super()._request(
+            method, f"http://{parts.hostname}:{self._port}{parts.path or '/'}", **kwargs
+        )  # type: ignore[arg-type]
 
 
 @contextlib.asynccontextmanager
@@ -232,8 +231,17 @@ class InProcessRemoteHttp(RemoteHttp):
         self.app: object = None
         self.requests: list[tuple[str, str, dict[str, str]]] = []
 
-    async def _request(self, method: str, url: str, *, headers: dict[str, str], body: bytes | None, max_bytes: int,  # type: ignore[override]
-                       accept: tuple[str, ...], expect_body: bool = True):  # type: ignore[no-untyped-def]
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str],
+        body: bytes | None,
+        max_bytes: int,  # type: ignore[override]
+        accept: tuple[str, ...],
+        expect_body: bool = True,
+    ):  # type: ignore[no-untyped-def]
         import httpx
 
         from app.protocols.remote_http import RemoteProtocolError
@@ -242,7 +250,9 @@ class InProcessRemoteHttp(RemoteHttp):
         require(self._settings, Feature.REMOTE_AGENT_CALLS)
         validate_url(url, REMOTE_AGENT_URL_POLICY)
         self.requests.append((method, url, dict(headers)))
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app, client=("198.51.100.7", 4444))) as client:  # type: ignore[arg-type]
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=self.app, client=("198.51.100.7", 4444))
+        ) as client:  # type: ignore[arg-type]
             response = await client.request(method, url, headers=headers, content=body)
         if not expect_body and response.status_code in (200, 202, 204):
             return response, b""

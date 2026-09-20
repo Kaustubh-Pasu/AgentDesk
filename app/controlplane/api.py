@@ -82,8 +82,14 @@ class RemoteRegistrar:
         headers = {"Authorization": f"Bearer {self._settings.controlplane_token.get_secret_value()}"}
         body = {"tenant_id": str(tenant_id), "owner_id": str(owner_id), "step": step}
         try:
-            async with httpx.AsyncClient(timeout=60, trust_env=False, follow_redirects=False, transport=self._transport) as client:
-                response = await client.post(f"{self._settings.controlplane_url.rstrip('/')}/internal/ans/step", json=body, headers=headers)
+            async with httpx.AsyncClient(
+                timeout=60, trust_env=False, follow_redirects=False, transport=self._transport
+            ) as client:
+                response = await client.post(
+                    f"{self._settings.controlplane_url.rstrip('/')}/internal/ans/step",
+                    json=body,
+                    headers=headers,
+                )
             data: dict[str, Any] = response.json()
         except (httpx.HTTPError, ValueError) as exc:
             raise RegistrationError("controlplane_unavailable") from exc

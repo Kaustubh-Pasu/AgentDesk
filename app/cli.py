@@ -1,7 +1,7 @@
 """Operator CLI (never reachable from HTTP).
 
-    python -m app.cli create-owner     # one-time owner seeding from OWNER_EMAIL / OWNER_PASSWORD (env or prompt)
-    python -m app.cli revoke-sessions  # revoke every session of OWNER_EMAIL (incident response)
+python -m app.cli create-owner     # one-time owner seeding from OWNER_EMAIL / OWNER_PASSWORD (env or prompt)
+python -m app.cli revoke-sessions  # revoke every session of OWNER_EMAIL (incident response)
 """
 
 from __future__ import annotations
@@ -20,8 +20,10 @@ from app.settings import get_settings
 
 async def _create_owner() -> int:
     settings = get_settings()
-    email = (settings.owner_email or input("Owner email: ")).strip().lower()
-    password = settings.owner_password.get_secret_value() or getpass.getpass("Owner password (min 12 chars): ")
+    email = (settings.owner_email or input("Owner email: ")).strip().lower()  # noqa: ASYNC250 - one-shot interactive CLI
+    password = settings.owner_password.get_secret_value() or getpass.getpass(
+        "Owner password (min 12 chars): "
+    )
     try:
         check_password_strength(password)
     except WeakPasswordError as exc:
@@ -44,7 +46,9 @@ async def _revoke_sessions() -> int:
     settings = get_settings()
     db = Database(settings.database_url)
     async with db.session() as session:
-        user = (await session.execute(select(User).where(User.email == settings.owner_email.lower()))).scalar_one_or_none()
+        user = (
+            await session.execute(select(User).where(User.email == settings.owner_email.lower()))
+        ).scalar_one_or_none()
         if user is None:
             print("no such user", file=sys.stderr)
             return 1

@@ -59,9 +59,20 @@ def scraper_routes(settings: Settings, fetcher: SafeFetcher | None = None) -> li
             return JSONResponse({"error": {"code": exc.code}}, 422)
         except (ValueError, KeyError):
             return JSONResponse({"error": {"code": "bad_request"}}, 400)
-        pages = [{"url": p.url, "title": p.title, "description": p.description, "headings": p.headings, "text": p.text,
-                  "structured": p.structured} for p in result.pages]
-        return JSONResponse({"pages": pages, "bytes_fetched": result.bytes_fetched, "skipped": result.skipped[:100]})
+        pages = [
+            {
+                "url": p.url,
+                "title": p.title,
+                "description": p.description,
+                "headings": p.headings,
+                "text": p.text,
+                "structured": p.structured,
+            }
+            for p in result.pages
+        ]
+        return JSONResponse(
+            {"pages": pages, "bytes_fetched": result.bytes_fetched, "skipped": result.skipped[:100]}
+        )
 
     return [Route("/internal/crawl", crawl, methods=["POST"])]
 
@@ -74,9 +85,15 @@ class RemoteScraper:
     async def crawl(self, start_url: str) -> CrawlResult:
         validate_url(start_url, IMPORT_URL_POLICY)  # never even ask the scraper for a URL that fails policy
         try:
-            async with httpx.AsyncClient(timeout=policy.CRAWL_WALL_CLOCK_S + 15, trust_env=False, follow_redirects=False,
-                                         transport=self._transport) as client:
-                response = await client.post(f"{self._settings.scraper_url.rstrip('/')}/internal/crawl", json={"url": start_url})
+            async with httpx.AsyncClient(
+                timeout=policy.CRAWL_WALL_CLOCK_S + 15,
+                trust_env=False,
+                follow_redirects=False,
+                transport=self._transport,
+            ) as client:
+                response = await client.post(
+                    f"{self._settings.scraper_url.rstrip('/')}/internal/crawl", json={"url": start_url}
+                )
         except httpx.HTTPError as exc:
             raise FetchError("scraper_unavailable", type(exc).__name__) from exc
         if response.status_code == 422:
@@ -91,8 +108,17 @@ class RemoteScraper:
             parsed = _CrawlResponse.model_validate(response.json())
         except (ValueError, ValidationError) as exc:
             raise FetchError("scraper_bad_response") from exc
-        pages = [ExtractedPage(url=p.url, title=p.title, description=p.description, headings=p.headings, text=p.text,
-                               structured=p.structured) for p in parsed.pages]
+        pages = [
+            ExtractedPage(
+                url=p.url,
+                title=p.title,
+                description=p.description,
+                headings=p.headings,
+                text=p.text,
+                structured=p.structured,
+            )
+            for p in parsed.pages
+        ]
         return CrawlResult(pages=pages, bytes_fetched=parsed.bytes_fetched, skipped=list(parsed.skipped))
 
 

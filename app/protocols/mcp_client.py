@@ -43,6 +43,10 @@ class McpSession:
     tools: list[McpTool] = field(default_factory=list)
 
 
+def _obj(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _result(data: dict[str, Any] | None, what: str) -> dict[str, Any]:
     if data is None:
         raise RemoteProtocolError("invalid_response", f"no response to {what}")
@@ -77,7 +81,7 @@ class McpClient:
         version = result.get("protocolVersion")
         if not isinstance(version, str) or version not in SUPPORTED_PROTOCOL_VERSIONS:
             raise RemoteProtocolError("protocol_version", "unsupported MCP protocol version")
-        info = result.get("serverInfo") if isinstance(result.get("serverInfo"), dict) else {}
+        info = _obj(result.get("serverInfo"))
         session = McpSession(
             url=url,
             protocol_version=version,
@@ -108,10 +112,13 @@ class McpClient:
                 or not _TOOL_NAME.match(tool["name"])
             ):
                 raise RemoteProtocolError("invalid_response", "tools/list: bad tool entry")
-            schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else {}
-            annotations = tool.get("annotations") if isinstance(tool.get("annotations"), dict) else {}
-            props = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
-            required = [r for r in schema.get("required", []) if isinstance(r, str)][:20]
+            schema = _obj(tool.get("inputSchema"))
+            annotations = _obj(tool.get("annotations"))
+            props = _obj(schema.get("properties"))
+            raw_required = schema.get("required")
+            required = [
+                r for r in (raw_required if isinstance(raw_required, list) else []) if isinstance(r, str)
+            ][:20]
             session.tools.append(
                 McpTool(
                     name=tool["name"],

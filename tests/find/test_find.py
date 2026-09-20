@@ -26,7 +26,9 @@ def service_for(w: World, **overrides: object) -> FindService:
 
 
 def test_intent_is_bounded_enum_tags_and_keywords_only() -> None:
-    request = normalize_query("Please find me an agent that knows COFFEE shop opening hours near https://evil.example/x?y=1 ; rm -rf /")
+    request = normalize_query(
+        "Please find me an agent that knows COFFEE shop opening hours near https://evil.example/x?y=1 ; rm -rf /"
+    )
     assert IntentTag.HOURS in request.tags and IntentTag.MENU in request.tags
     assert "coffee" in request.keywords and len(request.keywords) <= 12 and len(request.search_text) <= 256
     assert all(k.isascii() and "/" not in k and ":" not in k for k in request.keywords)
@@ -36,7 +38,10 @@ def test_intent_is_bounded_enum_tags_and_keywords_only() -> None:
 async def test_discover_verify_communicate(db: Database, tmp_path) -> None:  # type: ignore[no-untyped-def]
     async with world(db, tmp_path) as w:
         w.ans.add_active_agent("gone.example.org", status="REVOKED")
-        outcome = await service_for(w).find(FindInput(query="coffee shop hours", question="When are you open on Saturday?"), principal="ip:1.2.3.4")
+        outcome = await service_for(w).find(
+            FindInput(query="coffee shop hours", question="When are you open on Saturday?"),
+            principal="ip:1.2.3.4",
+        )
     assert outcome.error == "" and outcome.chosen is not None and outcome.chosen.agent_host == DEMO
     assert [c.agent_host for c in outcome.candidates] == [DEMO]  # REVOKED agents are never candidates
     assert outcome.reply_protocol == "A2A" and "Saturday" in outcome.reply
@@ -51,7 +56,9 @@ async def test_exact_host_path_and_mcp_fallback(db: Database, tmp_path) -> None:
     async with world(db, tmp_path) as w:
         agent = w.ans.agents[w.agent_id]
         agent["endpoints"] = [e for e in agent["endpoints"] if e["protocol"] == "MCP"]
-        outcome = await service_for(w).find(FindInput(query="exact lookup", exact_host=DEMO, question="Do you have wifi?"), principal="p")
+        outcome = await service_for(w).find(
+            FindInput(query="exact lookup", exact_host=DEMO, question="Do you have wifi?"), principal="p"
+        )
     assert outcome.chosen is not None and outcome.reply_protocol == "MCP" and "wifi" in outcome.reply.lower()
 
 
@@ -74,8 +81,12 @@ async def test_high_trust_score_grants_nothing(db: Database, tmp_path) -> None: 
 
 async def test_remote_calls_breaker_still_verifies(db: Database, tmp_path) -> None:  # type: ignore[no-untyped-def]
     async with world(db, tmp_path) as w:
-        outcome = await service_for(w, disable_remote_agent_calls=True).find(FindInput(query="coffee", question="hi"), principal="p")
-    assert outcome.reply == ""  # with the breaker on, even metadata fetches are refused, so nothing verifies and nothing is contacted
+        outcome = await service_for(w, disable_remote_agent_calls=True).find(
+            FindInput(query="coffee", question="hi"), principal="p"
+        )
+    assert (
+        outcome.reply == ""
+    )  # with the breaker on, even metadata fetches are refused, so nothing verifies and nothing is contacted
     assert outcome.chosen is None
 
 
@@ -95,9 +106,17 @@ async def test_search_results_are_cached_briefly(db: Database, tmp_path) -> None
     async with world(db, tmp_path) as w:
         service = service_for(w)
         await service.find(FindInput(query="coffee", connect=False), principal="a")
-        searches = sum(r.url.path.endswith("search-registered-agents") and b"query" in r.content for r in w.ans.requests)
+        searches = sum(
+            r.url.path.endswith("search-registered-agents") and b"query" in r.content for r in w.ans.requests
+        )
         await service.find(FindInput(query="coffee", connect=False), principal="b")
-        assert sum(r.url.path.endswith("search-registered-agents") and b"query" in r.content for r in w.ans.requests) == searches
+        assert (
+            sum(
+                r.url.path.endswith("search-registered-agents") and b"query" in r.content
+                for r in w.ans.requests
+            )
+            == searches
+        )
 
 
 async def test_desk_backend_text_summaries(db: Database, tmp_path) -> None:  # type: ignore[no-untyped-def]

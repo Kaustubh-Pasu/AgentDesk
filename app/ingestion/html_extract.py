@@ -18,13 +18,50 @@ from bs4 import BeautifulSoup, Comment, Tag
 from app.ingestion import policy
 from app.models.schemas import clean_text
 
-_DROP_TAGS = ("script", "style", "noscript", "template", "iframe", "frame", "frameset", "object", "embed", "applet", "svg",
-              "canvas", "form", "input", "button", "select", "textarea", "link", "meta", "base", "audio", "video", "source",
-              "dialog")
-_HIDDEN_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0(\.0+)?\s*(;|$)", re.I)
-_JSONLD_KEYS = ("name", "description", "telephone", "email", "address", "openingHours", "openingHoursSpecification",
-                "priceRange", "servesCuisine", "url")
-_BUSINESS_TYPES = re.compile(r"business|restaurant|cafe|store|organization|shop|service|hotel|clinic|salon|bakery|bar", re.I)
+_DROP_TAGS = (
+    "script",
+    "style",
+    "noscript",
+    "template",
+    "iframe",
+    "frame",
+    "frameset",
+    "object",
+    "embed",
+    "applet",
+    "svg",
+    "canvas",
+    "form",
+    "input",
+    "button",
+    "select",
+    "textarea",
+    "link",
+    "meta",
+    "base",
+    "audio",
+    "video",
+    "source",
+    "dialog",
+)
+_HIDDEN_STYLE = re.compile(
+    r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0(\.0+)?\s*(;|$)", re.I
+)
+_JSONLD_KEYS = (
+    "name",
+    "description",
+    "telephone",
+    "email",
+    "address",
+    "openingHours",
+    "openingHoursSpecification",
+    "priceRange",
+    "servesCuisine",
+    "url",
+)
+_BUSINESS_TYPES = re.compile(
+    r"business|restaurant|cafe|store|organization|shop|service|hotel|clinic|salon|bakery|bar", re.I
+)
 
 
 @dataclass
@@ -49,7 +86,11 @@ def _bounded_json(value: Any, depth: int = 0) -> Any:
     if isinstance(value, list):
         return [v for v in (_bounded_json(i, depth + 1) for i in value[:20]) if v not in (None, "", [], {})]
     if isinstance(value, dict):
-        out = {str(k)[:40]: _bounded_json(v, depth + 1) for k, v in list(value.items())[:20] if not str(k).startswith("@") or k == "@type"}
+        out = {
+            str(k)[:40]: _bounded_json(v, depth + 1)
+            for k, v in list(value.items())[:20]
+            if not str(k).startswith("@") or k == "@type"
+        }
         return {k: v for k, v in out.items() if v not in (None, "", [], {})}
     return None
 
@@ -64,7 +105,9 @@ def _json_ld(soup: BeautifulSoup) -> list[dict[str, Any]]:
             data = json.loads(raw)
         except (ValueError, RecursionError):
             continue
-        nodes = data if isinstance(data, list) else data.get("@graph", [data]) if isinstance(data, dict) else []
+        nodes = (
+            data if isinstance(data, list) else data.get("@graph", [data]) if isinstance(data, dict) else []
+        )
         for node in nodes[:10] if isinstance(nodes, list) else []:
             if isinstance(node, dict) and _BUSINESS_TYPES.search(str(node.get("@type", ""))):
                 kept = {k: _bounded_json(node[k]) for k in _JSONLD_KEYS if k in node}
@@ -94,7 +137,11 @@ def _same_site_links(soup: BeautifulSoup, base_url: str) -> list[str]:
         except ValueError:
             continue
         # Same ORIGIN as the (already policy-validated) page URL only: a link can never widen scheme, host or port.
-        if (parts.scheme, (parts.hostname or "").lower(), parts.port) != (base.scheme, (base.hostname or "").lower(), base.port):
+        if (parts.scheme, (parts.hostname or "").lower(), parts.port) != (
+            base.scheme,
+            (base.hostname or "").lower(),
+            base.port,
+        ):
             continue
         path = parts.path or "/"
         lowered = path.lower()
@@ -125,7 +172,13 @@ def extract_html(body: bytes, url: str) -> ExtractedPage:
     for tag in [t for t in soup.find_all(True) if _is_hidden(t)]:
         if not tag.decomposed:
             tag.decompose()
-    page.headings = [h for h in (clean_text(t.get_text(" ", strip=True))[:160] for t in soup.find_all(["h1", "h2", "h3"])[:40]) if h]
+    page.headings = [
+        h
+        for h in (
+            clean_text(t.get_text(" ", strip=True))[:160] for t in soup.find_all(["h1", "h2", "h3"])[:40]
+        )
+        if h
+    ]
     root = soup.find("main") or soup.body or soup
     lines = [clean_text(line) for line in root.get_text("\n", strip=True).split("\n")]
     page.text = "\n".join(line for line in lines if line)[: policy.MAX_TEXT_CHARS_PER_PAGE]

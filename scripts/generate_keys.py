@@ -17,12 +17,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.ans.certs import CertError, KeyStore  # noqa: E402
-from app.settings import get_settings  # noqa: E402
+from app.ans.certs import CertError, KeyStore
+from app.settings import get_settings
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("secrets")
     csr = sub.add_parser("csr")
@@ -33,13 +35,25 @@ def main() -> int:
         if not sys.stdout.isatty():
             print("refusing to print secrets to a non-terminal (pipe/file/CI log)", file=sys.stderr)
             return 2
-        for name in ("SESSION_SECRET", "CSRF_SECRET", "API_TOKEN_SECRET", "CONTROLPLANE_TOKEN", "POSTGRES_PASSWORD", "APP_DB_PASSWORD"):
+        for name in (
+            "SESSION_SECRET",
+            "CSRF_SECRET",
+            "API_TOKEN_SECRET",
+            "CONTROLPLANE_TOKEN",
+            "POSTGRES_PASSWORD",
+            "APP_DB_PASSWORD",
+        ):
             print(f"{name}={secrets.token_urlsafe(48)}")
-        print("\n# paste into secrets/*.env (chmod 600). These values are not stored anywhere else.", file=sys.stderr)
+        print(
+            "\n# paste into secrets/*.env (chmod 600). These values are not stored anywhere else.",
+            file=sys.stderr,
+        )
         return 0
     settings = get_settings()
     try:
-        bundle = KeyStore(settings.keys_path, settings.base_domain).csr_bundle(args.host, args.version or settings.ans_agent_version)
+        bundle = KeyStore(settings.keys_path, settings.base_domain).csr_bundle(
+            args.host, args.version or settings.ans_agent_version
+        )
     except (CertError, ValueError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2

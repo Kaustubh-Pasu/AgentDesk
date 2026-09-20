@@ -15,13 +15,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.ans.client import AnsClient  # noqa: E402
-from app.ans.evidence import SecretLeak, build_proof, write_evidence_bundle  # noqa: E402
-from app.ans.verifier import Verifier  # noqa: E402
-from app.logging_config import configure_logging  # noqa: E402
-from app.protocols.remote_http import RemoteHttp  # noqa: E402
-from app.security.hosts import HostPolicyError, validate_agent_host  # noqa: E402
-from app.settings import get_settings  # noqa: E402
+from app.ans.client import AnsClient
+from app.ans.evidence import SecretLeak, build_proof, write_evidence_bundle
+from app.ans.verifier import Verifier
+from app.logging_config import configure_logging
+from app.protocols.remote_http import RemoteHttp
+from app.security.hosts import HostPolicyError, validate_agent_host
+from app.settings import get_settings
 
 
 async def run(hosts: list[str]) -> int:
@@ -50,7 +50,9 @@ async def run(hosts: list[str]) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--host", action="append", required=True)
     return asyncio.run(run(parser.parse_args().host))
 

@@ -33,21 +33,21 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.agents.registry import AgentRegistry  # noqa: E402
-from app.ans.certs import KeyStore, load_certificates, summarize  # noqa: E402
-from app.ans.client import AnsApiError, AnsClient  # noqa: E402
-from app.ans.evidence import assert_no_secrets, write_evidence_bundle  # noqa: E402
-from app.ans.registration import RegistrationError, RegistrationFlow, RegistrationSnapshot  # noqa: E402
-from app.ans.verifier import make_tls_probe  # noqa: E402
-from app.logging_config import configure_logging  # noqa: E402
-from app.models.db import Database  # noqa: E402
-from app.protocols.a2a_client import A2AClient  # noqa: E402
-from app.protocols.mcp_client import McpClient  # noqa: E402
-from app.protocols.remote_http import RemoteHttp, RemoteProtocolError  # noqa: E402
-from app.security.hosts import HostPolicyError, validate_agent_host  # noqa: E402
-from app.security.redaction import redact_text  # noqa: E402
-from app.security.ssrf import GlobalOnlyPolicy, SSRFBlocked, system_resolver  # noqa: E402
-from app.settings import Settings, get_settings  # noqa: E402
+from app.agents.registry import AgentRegistry
+from app.ans.certs import KeyStore, load_certificates, summarize
+from app.ans.client import AnsApiError, AnsClient
+from app.ans.evidence import assert_no_secrets, write_evidence_bundle
+from app.ans.registration import RegistrationError, RegistrationFlow, RegistrationSnapshot
+from app.ans.verifier import make_tls_probe
+from app.logging_config import configure_logging
+from app.models.db import Database
+from app.protocols.a2a_client import A2AClient
+from app.protocols.mcp_client import McpClient
+from app.protocols.remote_http import RemoteHttp, RemoteProtocolError
+from app.security.hosts import HostPolicyError, validate_agent_host
+from app.security.redaction import redact_text
+from app.security.ssrf import GlobalOnlyPolicy, SSRFBlocked, system_resolver
+from app.settings import Settings, get_settings
 
 EXIT_OK, EXIT_ACTION_REQUIRED, EXIT_FAILED = 0, 3, 1
 PLACEHOLDER_DOMAINS = {"localhost", "example.com", "example.test", "example.org"}
@@ -77,12 +77,16 @@ def save_state(settings: Settings, snapshot: RegistrationSnapshot) -> None:
 def gddy_report() -> None:
     gddy = shutil.which("gddy")
     if gddy is None:
-        say("gddy: not installed (optional). Install: curl -fsSL https://github.com/godaddy/cli/releases/latest/download/install.sh | bash")
+        say(
+            "gddy: not installed (optional). Install: curl -fsSL https://github.com/godaddy/cli/releases/latest/download/install.sh | bash"
+        )
         return
     for args in (["--version"], ["env", "get"], ["auth", "status"]):
         try:  # argument ARRAYS of constants only; no shell; output passes through the secret redactor
-            done = subprocess.run([gddy, *args], capture_output=True, text=True, timeout=20, check=False)  # noqa: S603
-            say(f"gddy {' '.join(args)} → exit {done.returncode}: {(done.stdout or done.stderr).strip()[:400]}")
+            done = subprocess.run([gddy, *args], capture_output=True, text=True, timeout=20, check=False)
+            say(
+                f"gddy {' '.join(args)} → exit {done.returncode}: {(done.stdout or done.stderr).strip()[:400]}"
+            )
         except (OSError, subprocess.TimeoutExpired) as exc:
             say(f"gddy {' '.join(args)} failed: {type(exc).__name__}")
 
@@ -95,19 +99,39 @@ def gddy_publish_txt(records: list[dict[str, Any]], zone: str, assume_yes: bool)
     for record in records:
         name = str(record["name"])
         if record["type"] != "TXT" or not name.endswith("." + zone):
-            say(f"  skipped (not a TXT record inside zone {zone}; create it manually): {record['type']} {name}")
+            say(
+                f"  skipped (not a TXT record inside zone {zone}; create it manually): {record['type']} {name}"
+            )
             continue
         relative = name[: -len(zone) - 1]
-        args = [gddy, "dns", "add", zone, "--type", "TXT", "--name", relative, "--data", str(record["value"]), "--ttl", "600"]
-        dry = subprocess.run([*args, "--dry-run"], capture_output=True, text=True, timeout=30, check=False)  # noqa: S603
-        say(f"  dry-run: gddy dns add {zone} --type TXT --name {relative} --data <value> --ttl 600 → exit {dry.returncode} {dry.stdout.strip()[:300]}")
+        args = [
+            gddy,
+            "dns",
+            "add",
+            zone,
+            "--type",
+            "TXT",
+            "--name",
+            relative,
+            "--data",
+            str(record["value"]),
+            "--ttl",
+            "600",
+        ]
+        dry = subprocess.run([*args, "--dry-run"], capture_output=True, text=True, timeout=30, check=False)
+        say(
+            f"  dry-run: gddy dns add {zone} --type TXT --name {relative} --data <value> --ttl 600 → exit {dry.returncode} {dry.stdout.strip()[:300]}"
+        )
         if dry.returncode != 0:
             say("  dry-run failed; not applying.")
             continue
-        if not assume_yes and input(f"  type the record name to CONFIRM creating TXT {name}: ").strip() != name:
+        if (
+            not assume_yes
+            and input(f"  type the record name to CONFIRM creating TXT {name}: ").strip() != name
+        ):
             say("  not confirmed; skipped.")
             continue
-        done = subprocess.run(args, capture_output=True, text=True, timeout=60, check=False)  # noqa: S603
+        done = subprocess.run(args, capture_output=True, text=True, timeout=60, check=False)
         say(f"  applied → exit {done.returncode} {(done.stdout or done.stderr).strip()[:300]}")
 
 
@@ -138,12 +162,19 @@ def print_records(title: str, records: list[dict[str, Any]]) -> None:
     say(f"\n{title}")
     for r in records:
         flag = "" if r.get("required", True) else "   (optional)"
-        say(f"  {r['type']:<5} {r['name']}  TTL {max(600, int(r.get('ttl') or 600))}{flag}\n        value: {r['value']}")
+        say(
+            f"  {r['type']:<5} {r['name']}  TTL {max(600, int(r.get('ttl') or 600))}{flag}\n        value: {r['value']}"
+        )
 
 
-async def collect_certificates(client: AnsClient, settings: Settings, snapshot: RegistrationSnapshot) -> dict[str, Any]:
+async def collect_certificates(
+    client: AnsClient, settings: Settings, snapshot: RegistrationSnapshot
+) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    for kind, getter in (("identity", client.get_identity_certificates), ("server", client.get_server_certificates)):
+    for kind, getter in (
+        ("identity", client.get_identity_certificates),
+        ("server", client.get_server_certificates),
+    ):
         try:
             certs = await getter(snapshot.agent_id or "")
         except AnsApiError as exc:
@@ -152,7 +183,9 @@ async def collect_certificates(client: AnsClient, settings: Settings, snapshot: 
         if not certs:
             out[kind] = {"error": "none_issued_yet"}
             continue
-        leaf = load_certificates(certs[-1].certificate_pem, limit=1)[0]  # refuses anything containing a private key
+        leaf = load_certificates(certs[-1].certificate_pem, limit=1)[
+            0
+        ]  # refuses anything containing a private key
         out[kind] = summarize(leaf).model_dump(mode="json")
         pem_path = settings.artifacts_path / f"{snapshot.agent_host}-{kind}-cert.pem"
         pem_path.write_text(certs[-1].certificate_pem)
@@ -165,7 +198,9 @@ async def main_async(args: argparse.Namespace) -> int:
     configure_logging("WARNING", settings.secret_values())
     # 1. domain + host policy
     if settings.base_domain in PLACEHOLDER_DOMAINS:
-        say("BASE_DOMAIN is a placeholder. Set BASE_DOMAIN to the MLH domain you own. [WAITING_FOR_EXTERNAL_INPUT]")
+        say(
+            "BASE_DOMAIN is a placeholder. Set BASE_DOMAIN to the MLH domain you own. [WAITING_FOR_EXTERNAL_INPUT]"
+        )
         return EXIT_FAILED
     try:
         host = validate_agent_host(args.host, settings.base_domain)
@@ -178,9 +213,13 @@ async def main_async(args: argparse.Namespace) -> int:
         say(f"{host} is not a published agent in this deployment's database.")
         return EXIT_FAILED
     client = AnsClient(settings)
-    say(f"Agent {host} v{agent.version} · ANS environment: {client.environment} ({settings.godaddy_api_base}) · auth scheme: {settings.ans_auth_scheme}")
+    say(
+        f"Agent {host} v{agent.version} · ANS environment: {client.environment} ({settings.godaddy_api_base}) · auth scheme: {settings.ans_auth_scheme}"
+    )
     if not client.configured:
-        say("No GoDaddy credential configured (GODADDY_PAT, or GODADDY_API_KEY + GODADDY_API_SECRET with ANS_AUTH_SCHEME=sso-key). [WAITING_FOR_EXTERNAL_INPUT]")
+        say(
+            "No GoDaddy credential configured (GODADDY_PAT, or GODADDY_API_KEY + GODADDY_API_SECRET with ANS_AUTH_SCHEME=sso-key). [WAITING_FOR_EXTERNAL_INPUT]"
+        )
         return EXIT_FAILED
     flow = RegistrationFlow(client, KeyStore(settings.keys_path, settings.base_domain), settings)
     state = load_state(settings, host)
@@ -197,60 +236,101 @@ async def main_async(args: argparse.Namespace) -> int:
         else:
             say("\n[2] Public HTTPS / A2A / MCP check (from this machine, through the public internet):")
             if not await check_public(settings, host):
-                say("Public endpoints are not healthy. Fix Gates 1–3 first; ANS validation would fail. Nothing was registered.")
+                say(
+                    "Public endpoints are not healthy. Fix Gates 1–3 first; ANS validation would fail. Nothing was registered."
+                )
                 return EXIT_FAILED
             say("\n[3] gddy CLI:")
             gddy_report()
             say("\n[4–5] Generating/loading keys + CSRs and submitting POST /v1/agents/register …")
             snapshot = await flow.submit(agent)
         save_state(settings, snapshot)
-        say(f"\nLive status from GoDaddy: {snapshot.status}   agentId={snapshot.agent_id}   {snapshot.ans_name}")
+        say(
+            f"\nLive status from GoDaddy: {snapshot.status}   agentId={snapshot.agent_id}   {snapshot.ans_name}"
+        )
         if args.status:
             return EXIT_OK
 
         if snapshot.status == "PENDING_VALIDATION":
             if snapshot.acme_records and not args.verify:
-                print_records("[7] Publish this ACME DNS-01 TXT record exactly, wait until it resolves publicly, then re-run with --verify:", snapshot.acme_records)
+                print_records(
+                    "[7] Publish this ACME DNS-01 TXT record exactly, wait until it resolves publicly, then re-run with --verify:",
+                    snapshot.acme_records,
+                )
                 if args.gddy_dns:
                     gddy_publish_txt(snapshot.acme_records, args.zone or settings.base_domain, args.yes)
                 return EXIT_ACTION_REQUIRED
             say("\n[9] POST verify-acme …")
             snapshot = await flow.trigger_acme(snapshot.agent_id or "", host, agent.version)
-            snapshot = await flow.poll_until(snapshot.agent_id or "", host, agent.version, until=frozenset({"PENDING_DNS", "ACTIVE"}), timeout_s=args.timeout)
+            snapshot = await flow.poll_until(
+                snapshot.agent_id or "",
+                host,
+                agent.version,
+                until=frozenset({"PENDING_DNS", "ACTIVE"}),
+                timeout_s=args.timeout,
+            )
             save_state(settings, snapshot)
             say(f"Live status from GoDaddy: {snapshot.status}")
         if snapshot.status == "PENDING_DNS":
             if snapshot.dns_records and not args.verify_dns:
-                print_records("Publish these ANS DNS records exactly (required ones at minimum), then re-run with --verify-dns:", snapshot.dns_records)
+                print_records(
+                    "Publish these ANS DNS records exactly (required ones at minimum), then re-run with --verify-dns:",
+                    snapshot.dns_records,
+                )
                 if snapshot.rejected_records:
-                    print_records("IGNORED (outside the exact-name policy for this host — do NOT create):", snapshot.rejected_records)
+                    print_records(
+                        "IGNORED (outside the exact-name policy for this host — do NOT create):",
+                        snapshot.rejected_records,
+                    )
                 if args.gddy_dns:
                     gddy_publish_txt(snapshot.dns_records, args.zone or settings.base_domain, args.yes)
                 return EXIT_ACTION_REQUIRED
             say("\n[9] POST verify-dns …")
             snapshot = await flow.trigger_dns(snapshot.agent_id or "", host, agent.version)
-            snapshot = await flow.poll_until(snapshot.agent_id or "", host, agent.version, until=frozenset({"ACTIVE"}), timeout_s=args.timeout)
+            snapshot = await flow.poll_until(
+                snapshot.agent_id or "",
+                host,
+                agent.version,
+                until=frozenset({"ACTIVE"}),
+                timeout_s=args.timeout,
+            )
             save_state(settings, snapshot)
             say(f"Live status from GoDaddy: {snapshot.status}")
         if snapshot.status != "ACTIVE":
-            say(f"Not ACTIVE (status {snapshot.status}; next action: {snapshot.next_action}). Re-run this command later.")
+            say(
+                f"Not ACTIVE (status {snapshot.status}; next action: {snapshot.next_action}). Re-run this command later."
+            )
             return EXIT_ACTION_REQUIRED if snapshot.status.startswith("PENDING") else EXIT_FAILED
 
         say("\n[11] Retrieving public identity/server certificates …")
         certificates = await collect_certificates(client, settings, snapshot)
-        evidence = {"gate": 4, "observed": "GoDaddy ANS API reported ACTIVE during this run", "registration": snapshot.to_public_dict(),
-                    "api_base": settings.godaddy_api_base, "auth_scheme": settings.ans_auth_scheme, "certificates": certificates}
+        evidence = {
+            "gate": 4,
+            "observed": "GoDaddy ANS API reported ACTIVE during this run",
+            "registration": snapshot.to_public_dict(),
+            "api_base": settings.godaddy_api_base,
+            "auth_scheme": settings.ans_auth_scheme,
+            "certificates": certificates,
+        }
         assert_no_secrets(json.dumps(evidence, default=str), settings)
         path = write_evidence_bundle(evidence, settings.artifacts_path, name=f"ans-active-{host}")
         say(f"[12] ACTIVE ✔  Redacted evidence written to {path}")
-        say(f"     Public cross-checks:  curl -s {settings.godaddy_api_base}/v1/ans/registered-agents/{snapshot.agent_id}")
-        say(f"                           curl -s {settings.transparency_log_base}/v1/agents/{snapshot.agent_id}")
+        say(
+            f"     Public cross-checks:  curl -s {settings.godaddy_api_base}/v1/ans/registered-agents/{snapshot.agent_id}"
+        )
+        say(
+            f"                           curl -s {settings.transparency_log_base}/v1/agents/{snapshot.agent_id}"
+        )
         say(f"                           https://{host}/proof")
         return EXIT_OK
     except AnsApiError as exc:
-        say(f"GoDaddy ANS API error: HTTP {exc.status} {exc.code} {exc.message} {json.dumps(exc.details)[:600] if exc.details else ''}")
+        say(
+            f"GoDaddy ANS API error: HTTP {exc.status} {exc.code} {exc.message} {json.dumps(exc.details)[:600] if exc.details else ''}"
+        )
         if exc.status in (401, 403) or exc.code == "UNAUTHENTICATED_REDIRECT":
-            say("The credential was rejected. Official sources disagree on the ANS auth scheme: try ANS_AUTH_SCHEME=sso-key with an API key/secret, or a PAT with ANS access.")
+            say(
+                "The credential was rejected. Official sources disagree on the ANS auth scheme: try ANS_AUTH_SCHEME=sso-key with an API key/secret, or a PAT with ANS access."
+            )
         return EXIT_FAILED
     except RegistrationError as exc:
         say(f"Registration refused: {exc.code} — {exc}")
@@ -260,14 +340,30 @@ async def main_async(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--host", required=True, help="agent FQDN (direct child of BASE_DOMAIN)")
-    parser.add_argument("--status", action="store_true", help="print the live registry status and exit (no changes)")
-    parser.add_argument("--verify", action="store_true", help="the ACME TXT record is published: call verify-acme")
-    parser.add_argument("--verify-dns", action="store_true", help="the ANS DNS records are published: call verify-dns")
-    parser.add_argument("--gddy-dns", action="store_true", help="publish exact TXT records with `gddy dns add` (dry-run + confirmation)")
+    parser.add_argument(
+        "--status", action="store_true", help="print the live registry status and exit (no changes)"
+    )
+    parser.add_argument(
+        "--verify", action="store_true", help="the ACME TXT record is published: call verify-acme"
+    )
+    parser.add_argument(
+        "--verify-dns", action="store_true", help="the ANS DNS records are published: call verify-dns"
+    )
+    parser.add_argument(
+        "--gddy-dns",
+        action="store_true",
+        help="publish exact TXT records with `gddy dns add` (dry-run + confirmation)",
+    )
     parser.add_argument("--zone", default="", help="DNS zone managed at GoDaddy (default: BASE_DOMAIN)")
-    parser.add_argument("--yes", action="store_true", help="skip the per-record confirmation prompt (still runs the dry-run first)")
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="skip the per-record confirmation prompt (still runs the dry-run first)",
+    )
     parser.add_argument("--timeout", type=float, default=600.0, help="seconds to poll for a status change")
     if os.environ.get("ENV") == "production" and os.geteuid() == 0:
         print("refusing to run as root", file=sys.stderr)

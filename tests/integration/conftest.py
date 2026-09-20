@@ -46,7 +46,9 @@ class FakeCrawler:
 
 
 async def fake_tls(host: str) -> TlsEvidence:
-    return TlsEvidence(status="PASS", detail="test probe", version="TLSv1.3", hostname_verified=True, leaf_sha256="cd" * 32)
+    return TlsEvidence(
+        status="PASS", detail="test probe", version="TLSv1.3", hostname_verified=True, leaf_sha256="cd" * 32
+    )
 
 
 @dataclass
@@ -63,10 +65,16 @@ class Web:
         transport = httpx.ASGITransport(app=self.app, client=("203.0.113.9", 5555))  # type: ignore[arg-type]
         return httpx.AsyncClient(transport=transport, base_url=f"https://{host}", **kwargs)  # type: ignore[arg-type]
 
-    async def login(self, client: httpx.AsyncClient, email: str = "owner@agentdesk-demo.org", password: str = PASSWORD) -> httpx.Response:
+    async def login(
+        self, client: httpx.AsyncClient, email: str = "owner@agentdesk-demo.org", password: str = PASSWORD
+    ) -> httpx.Response:
         page = await client.get("/login")
         token = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)  # type: ignore[union-attr]
-        return await client.post("/login", data={"email": email, "password": password, "csrf_token": token}, headers={"Origin": ORIGIN})
+        return await client.post(
+            "/login",
+            data={"email": email, "password": password, "csrf_token": token},
+            headers={"Origin": ORIGIN},
+        )
 
     @staticmethod
     def form_tokens(html: str) -> tuple[str, list[str]]:
@@ -81,20 +89,38 @@ async def web(tmp_path) -> AsyncIterator[Web]:  # type: ignore[no-untyped-def]
 
 
 async def make_web(tmp_path, **overrides: object) -> AsyncIterator[Web]:  # type: ignore[no-untyped-def]
-    settings = make_settings(base_domain=BASE, godaddy_pat=PAT, keys_dir=str(tmp_path / "keys"), artifacts_dir=str(tmp_path / "artifacts"),
-                             trusted_proxy_cidrs="127.0.0.1/32", **overrides)
+    settings = make_settings(
+        base_domain=BASE,
+        godaddy_pat=PAT,
+        keys_dir=str(tmp_path / "keys"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        trusted_proxy_cidrs="127.0.0.1/32",
+        **overrides,
+    )
     db = Database("sqlite+aiosqlite:///:memory:")
     fake, crawler, remote = FakeANS(), FakeCrawler(), InProcessRemoteHttp(settings)
-    app, services = build_app(settings, Overrides(ans_transport=fake.transport, remote_http=remote, tls_probe=fake_tls, crawler=crawler, db=db,
-                                                  resolver=FakeResolver({DESK: ["93.184.216.34"], DEMO: ["93.184.216.34"],
-                                                                         f"bluedoor.{BASE}": ["93.184.216.34"]})))
+    app, services = build_app(
+        settings,
+        Overrides(
+            ans_transport=fake.transport,
+            remote_http=remote,
+            tls_probe=fake_tls,
+            crawler=crawler,
+            db=db,
+            resolver=FakeResolver(
+                {DESK: ["93.184.216.34"], DEMO: ["93.184.216.34"], f"bluedoor.{BASE}": ["93.184.216.34"]}
+            ),
+        ),
+    )
     assert services is not None
     remote.app = app
     async with run_lifespan(app):
         web = Web(app, services, settings, fake, crawler, remote)
         async with db.session() as session:
             for name in ("owner", "rival"):
-                user = User(email=f"{name}@agentdesk-demo.org", password_hash=hash_password(PASSWORD), role=Role.OWNER)
+                user = User(
+                    email=f"{name}@agentdesk-demo.org", password_hash=hash_password(PASSWORD), role=Role.OWNER
+                )
                 session.add(user)
                 web.owners[name] = user
             await session.commit()

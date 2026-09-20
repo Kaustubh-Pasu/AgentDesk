@@ -100,7 +100,9 @@ def build_services(settings: Settings, overrides: Overrides | None = None) -> Se
     registry = AgentRegistry(db, settings)
     ans = AnsClient(settings, transport=o.ans_transport)
     http = o.remote_http or RemoteHttp(settings)
-    verifier = Verifier(settings, ans, http, db, resolver=o.resolver or system_resolver, tls_probe=o.tls_probe)
+    verifier = Verifier(
+        settings, ans, http, db, resolver=o.resolver or system_resolver, tls_probe=o.tls_probe
+    )
     find = FindService(settings, ans, verifier, http, limiter, db)
     runtime = AgentRuntime(registry, settings, llm=llm, desk_backend=FindDeskBackend(find))
     tenants = TenantService(db, settings, registry, limiter, o.crawler or build_crawler(settings), llm)
@@ -110,8 +112,21 @@ def build_services(settings: Settings, overrides: Overrides | None = None) -> Se
     else:
         flow = RegistrationFlow(ans, KeyStore(settings.keys_path, settings.base_domain), settings)
         registrar = LocalRegistrar(RegistrationService(db, flow, registry, kv, settings))
-    return Services(settings, db, kv, limiter, registry, runtime, ans, verifier, ProofService(settings, verifier), find,
-                    tenants, registrar, McpProtocolServer(runtime, settings))
+    return Services(
+        settings,
+        db,
+        kv,
+        limiter,
+        registry,
+        runtime,
+        ans,
+        verifier,
+        ProofService(settings, verifier),
+        find,
+        tenants,
+        registrar,
+        McpProtocolServer(runtime, settings),
+    )
 
 
 class PublicRateLimitMiddleware:
@@ -134,10 +149,17 @@ class PublicRateLimitMiddleware:
         if scope["type"] == "http":
             bucket = self._bucket(scope.get("path", ""), scope.get("method", "GET"))
             if bucket is not None:
-                result = await self.limiter.hit(bucket[0], client_ip_from_scope(scope, self.settings), limit=bucket[1], window_s=60)
+                result = await self.limiter.hit(
+                    bucket[0], client_ip_from_scope(scope, self.settings), limit=bucket[1], window_s=60
+                )
                 if not result.allowed:
-                    start, body = _json_error(429, "rate_limited", "Too many requests.", correlation_id_var.get(),
-                                              [(b"retry-after", str(max(1, result.retry_after_s)).encode())])
+                    start, body = _json_error(
+                        429,
+                        "rate_limited",
+                        "Too many requests.",
+                        correlation_id_var.get(),
+                        [(b"retry-after", str(max(1, result.retry_after_s)).encode())],
+                    )
                     await send(start)
                     await send(body)
                     return
@@ -168,7 +190,9 @@ class SafeErrorMiddleware:
             if started:
                 return  # the registered handler already logged it (redacted) and answered with a safe 500
             log.exception("unhandled error before response start", extra={"path": scope.get("path", "")})
-            start, body = _json_error(500, "internal_error", "Something went wrong.", correlation_id_var.get())
+            start, body = _json_error(
+                500, "internal_error", "Something went wrong.", correlation_id_var.get()
+            )
             await send(start)
             await send(body)
 
@@ -194,7 +218,9 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
     return build_app(settings, overrides)[0]
 
 
-def build_app(settings: Settings | None = None, overrides: Overrides | None = None) -> tuple[ASGIApp, Services | None]:
+def build_app(
+    settings: Settings | None = None, overrides: Overrides | None = None
+) -> tuple[ASGIApp, Services | None]:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.secret_values())
 
@@ -203,15 +229,18 @@ def build_app(settings: Settings | None = None, overrides: Overrides | None = No
         return _wrap(inner, settings, None, browser=False), None
 
     services = build_services(settings, overrides)
-    configure_logging(settings.log_level, settings.secret_values())  # the MCP SDK may touch logging on construction
+    configure_logging(
+        settings.log_level, settings.secret_values()
+    )  # the MCP SDK may touch logging on construction
 
     @asynccontextmanager
     async def lifespan(_app: Any) -> AsyncIterator[None]:
         if not services.db.is_postgres:
             await services.db.create_all()  # development/test convenience; PostgreSQL uses Alembic migrations
-        if settings.service_role in ("all", "runtime", "desk"):
-            if await seed_demo_agent(services.db, settings):
-                log.info("seeded demo agent", extra={"agent_host": settings.demo_host})
+        if settings.service_role in ("all", "runtime", "desk") and await seed_demo_agent(
+            services.db, settings
+        ):
+            log.info("seeded demo agent", extra={"agent_host": settings.demo_host})
         async with services.mcp.lifespan():
             yield
         await services.kv.close()
@@ -219,21 +248,34 @@ def build_app(settings: Settings | None = None, overrides: Overrides | None = No
 
     if settings.service_role == "controlplane":
         assert isinstance(services.registrar, LocalRegistrar)
-        inner = Starlette(routes=[Route("/healthz", _healthz), *controlplane_routes(settings, services.registrar)], lifespan=lifespan)
+        inner = Starlette(
+            routes=[Route("/healthz", _healthz), *controlplane_routes(settings, services.registrar)],
+            lifespan=lifespan,
+        )
         return _wrap(inner, settings, None, browser=False), services
 
     from app.web.routes import register_web  # imported late: templates are not needed by the private roles
 
-    app = FastAPI(title="Agent Desk", docs_url=None, redoc_url=None, openapi_url=None, debug=False, lifespan=lifespan)
+    app = FastAPI(
+        title="Agent Desk", docs_url=None, redoc_url=None, openapi_url=None, debug=False, lifespan=lifespan
+    )
     app.state.services = services
     app.router.redirect_slashes = False  # no implicit redirects: unknown paths are plain 404s
+
     async def tls_ask(request: Any) -> JSONResponse:
         """Caddy on-demand-TLS gate: a certificate may be requested ONLY for a host we actually serve.
         Caddy answers 404 for /internal/* on the public side; this is reached over the private network."""
         served = await services.registry.resolve(request.query_params.get("domain", ""))
         return JSONResponse({"served": served is not None}, 200 if served is not None else 404)
 
-    app.router.routes.extend([Route("/healthz", _healthz), Route("/internal/tls-ask", tls_ask), *create_a2a_routes(services.runtime, settings), *services.mcp.routes()])
+    app.router.routes.extend(
+        [
+            Route("/healthz", _healthz),
+            Route("/internal/tls-ask", tls_ask),
+            *create_a2a_routes(services.runtime, settings),
+            *services.mcp.routes(),
+        ]
+    )
     register_web(app, services)
     return _wrap(app, settings, services.limiter, browser=True), services
 

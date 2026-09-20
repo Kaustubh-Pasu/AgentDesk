@@ -70,8 +70,19 @@ class ExtractionResult:
 def corpus(pages: list[ExtractedPage]) -> str:
     chunks, total = [], 0
     for page in pages:
-        chunk = "\n".join(filter(None, [f"## PAGE {page.url}", page.title, page.description, *page.headings[:15],
-                                        json.dumps(page.structured, ensure_ascii=False) if page.structured else "", page.text]))
+        chunk = "\n".join(
+            filter(
+                None,
+                [
+                    f"## PAGE {page.url}",
+                    page.title,
+                    page.description,
+                    *page.headings[:15],
+                    json.dumps(page.structured, ensure_ascii=False) if page.structured else "",
+                    page.text,
+                ],
+            )
+        )
         chunk = chunk[: policy.MAX_TEXT_CHARS_PER_PAGE]
         if total + len(chunk) > policy.MAX_TEXT_CHARS_TOTAL:
             chunk = chunk[: policy.MAX_TEXT_CHARS_TOTAL - total]
@@ -106,7 +117,9 @@ def parse_model_output(raw: str) -> ExtractionOutput:
 def _finalize(output: ExtractionOutput, pages: list[ExtractedPage]) -> ExtractionOutput:
     """Server-side facts win: source URLs are what WE fetched; capabilities ⊆ what the content supports."""
     profile = output.profile.model_copy(update={"source_urls": []})
-    profile = BusinessProfile.model_validate({**profile.model_dump(mode="json"), "source_urls": [p.url for p in pages][:10]})
+    profile = BusinessProfile.model_validate(
+        {**profile.model_dump(mode="json"), "source_urls": [p.url for p in pages][:10]}
+    )
     supported = profile.derived_capabilities()
     chosen = [c for c in supported if c in output.capabilities] or supported
     if Capability.BUSINESS_INFORMATION not in chosen:
@@ -123,7 +136,10 @@ def _address_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
-        parts = [value.get(k) for k in ("streetAddress", "addressLocality", "addressRegion", "postalCode", "addressCountry")]
+        parts = [
+            value.get(k)
+            for k in ("streetAddress", "addressLocality", "addressRegion", "postalCode", "addressCountry")
+        ]
         return ", ".join(str(p) for p in parts if isinstance(p, (str, int)) and str(p))
     return ""
 
@@ -134,7 +150,11 @@ def heuristic_extract(pages: list[ExtractedPage]) -> ExtractionOutput:
     structured = [node for page in pages for node in page.structured]
     text = "\n".join(page.text for page in pages)
     first = pages[0]
-    name = _first(structured, "name") or re.split(r"\s+[|\-–—:·]\s+", first.title)[0] or (first.headings[0] if first.headings else "")
+    name = (
+        _first(structured, "name")
+        or re.split(r"\s+[|\-–—:·]\s+", first.title)[0]
+        or (first.headings[0] if first.headings else "")
+    )
     name = clean_text(str(name))[:120] or "Unnamed business"
     description = clean_text(str(_first(structured, "description") or first.description))[:1200]
     phone_raw = str(_first(structured, "telephone") or (m.group(1) if (m := _PHONE.search(text)) else ""))
@@ -151,26 +171,43 @@ def heuristic_extract(pages: list[ExtractedPage]) -> ExtractionOutput:
             days, _, times = str(entry).partition(" ")
             if times:
                 hours.append({"days": days[:60], "hours": times[:80]})
-    candidate: dict[str, Any] = {"business_name": name, "description": description, "address": _address_text(_first(structured, "address"))[:300],
-                                 "contact": {"phone": phone, "email": email}, "hours": hours[:14]}
+    candidate: dict[str, Any] = {
+        "business_name": name,
+        "description": description,
+        "address": _address_text(_first(structured, "address"))[:300],
+        "contact": {"phone": phone, "email": email},
+        "hours": hours[:14],
+    }
     try:
         profile = BusinessProfile.model_validate(candidate)
     except ValidationError:
-        profile = BusinessProfile(business_name=name, description=description)  # drop anything that did not validate
+        profile = BusinessProfile(
+            business_name=name, description=description
+        )  # drop anything that did not validate
     return ExtractionOutput(profile=profile, capabilities=profile.derived_capabilities())
 
 
 # --------------------------------------------------------------------------- entry point
-async def extract_profile(pages: list[ExtractedPage], llm: LLMClient | None, *, principal: str) -> ExtractionResult:
+async def extract_profile(
+    pages: list[ExtractedPage], llm: LLMClient | None, *, principal: str
+) -> ExtractionResult:
     if not pages:
         raise ExtractionFailed("no_content")
     if llm is None:
-        return ExtractionResult(_finalize(heuristic_extract(pages), pages), "heuristic", 0,
-                                "No LLM configured: draft built from page structure only. Please review every field.")
+        return ExtractionResult(
+            _finalize(heuristic_extract(pages), pages),
+            "heuristic",
+            0,
+            "No LLM configured: draft built from page structure only. Please review every field.",
+        )
     text = corpus(pages)
     last_error = ""
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        user = text if not last_error else f"{text}\n\n(Your previous output was rejected: {last_error}. Output valid JSON only.)"
+        user = (
+            text
+            if not last_error
+            else f"{text}\n\n(Your previous output was rejected: {last_error}. Output valid JSON only.)"
+        )
         try:
             raw = await llm.complete(system=SYSTEM_PROMPT, user=user, principal=principal)
             return ExtractionResult(_finalize(parse_model_output(raw), pages), "llm", attempt)
@@ -180,5 +217,9 @@ async def extract_profile(pages: list[ExtractedPage], llm: LLMClient | None, *, 
         except LLMUnavailable as exc:
             last_error = exc.code
             break
-    return ExtractionResult(_finalize(heuristic_extract(pages), pages), "heuristic", MAX_ATTEMPTS,
-                            f"Model output was not usable ({last_error}); draft built from page structure. Owner review required.")
+    return ExtractionResult(
+        _finalize(heuristic_extract(pages), pages),
+        "heuristic",
+        MAX_ATTEMPTS,
+        f"Model output was not usable ({last_error}); draft built from page structure. Owner review required.",
+    )

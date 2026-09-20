@@ -44,14 +44,18 @@ def test_identity_csr_shape() -> None:
 def test_server_csr_shape_and_key_rules() -> None:
     csr = x509.load_pem_x509_csr(build_server_csr(generate_rsa_key(2048), HOST).encode())
     san = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-    assert san.get_values_for_type(x509.DNSName) == [HOST] and not san.get_values_for_type(x509.UniformResourceIdentifier)
+    assert san.get_values_for_type(x509.DNSName) == [HOST] and not san.get_values_for_type(
+        x509.UniformResourceIdentifier
+    )
     with pytest.raises(CertError, match="2048 or 4096"):
         build_server_csr(generate_rsa_key(3072), HOST)
     with pytest.raises(CertError):
         generate_rsa_key(1024)
 
 
-@pytest.mark.parametrize("host", ["Demo.Example.Test", "demo.example.test.", "a b.example.test", "x" * 70 + ".example.test"])
+@pytest.mark.parametrize(
+    "host", ["Demo.Example.Test", "demo.example.test.", "a b.example.test", "x" * 70 + ".example.test"]
+)
 def test_csr_rejects_non_canonical_hosts(host: str) -> None:
     with pytest.raises(CertError):
         build_identity_csr(generate_rsa_key(2048), host, "1.0.0")
@@ -65,14 +69,25 @@ def test_keystore_permissions_and_reuse(tmp_path) -> None:  # type: ignore[no-un
     assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     again = store.load_or_create(HOST, "1.0.0", "identity")
     assert again.public_key().public_numbers() == key.public_key().public_numbers()
-    assert store.load_or_create(HOST, "1.0.0", "server").public_key().public_numbers() != key.public_key().public_numbers()
+    assert (
+        store.load_or_create(HOST, "1.0.0", "server").public_key().public_numbers()
+        != key.public_key().public_numbers()
+    )
     os.chmod(path, 0o644)
     with pytest.raises(CertError, match="group/world"):
         store.load_or_create(HOST, "1.0.0", "identity")
 
 
-@pytest.mark.parametrize(("host", "version"), [("../../etc", "1.0.0"), ("evil.other.com", "1.0.0"), (HOST, "../1.0.0"),
-                                                (HOST, "1.0"), ("a.b." + TEST_BASE_DOMAIN, "1.0.0")])
+@pytest.mark.parametrize(
+    ("host", "version"),
+    [
+        ("../../etc", "1.0.0"),
+        ("evil.other.com", "1.0.0"),
+        (HOST, "../1.0.0"),
+        (HOST, "1.0"),
+        ("a.b." + TEST_BASE_DOMAIN, "1.0.0"),
+    ],
+)
 def test_keystore_never_builds_paths_from_untrusted_text(tmp_path, host: str, version: str) -> None:  # type: ignore[no-untyped-def]
     with pytest.raises(ValueError):
         KeyStore(tmp_path / "keys", TEST_BASE_DOMAIN).load_or_create(host, version, "identity")
@@ -85,7 +100,10 @@ def test_binding_checks(pki: FakePKI) -> None:
     assert check_binding(good, "other.example.test", "1.0.0")[0] == "FAIL"
     assert check_binding(good, HOST, "2.0.0")[0] == "FAIL"
     assert check_binding(pki.identity_cert(HOST, uri=""), HOST, "1.0.0")[0] == "FAIL"
-    assert check_binding(pki.identity_cert(HOST, uri="ans://v1.0.0.evil.example.test"), HOST, "1.0.0")[0] == "FAIL"
+    assert (
+        check_binding(pki.identity_cert(HOST, uri="ans://v1.0.0.evil.example.test"), HOST, "1.0.0")[0]
+        == "FAIL"
+    )
     assert check_binding(good, HOST, "1.0.0", now=datetime.now(UTC) + timedelta(days=400))[0] == "FAIL"
     assert check_binding(pki.identity_cert(HOST, start_days_ago=-5), HOST, "1.0.0")[0] == "FAIL"
 
@@ -111,10 +129,21 @@ def test_chain_verification_uses_only_provisioned_anchor(pki: FakePKI, tmp_path)
 
 
 def test_pem_loader_is_strict(pki: FakePKI) -> None:
-    key_pem = generate_rsa_key(2048).private_bytes(
-        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-    for bad in ("", "not pem", "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----", pem(pki.root) + key_pem,
-                pem(pki.root) * 20, "A" * 100_000):
+    key_pem = (
+        generate_rsa_key(2048)
+        .private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        )
+        .decode()
+    )
+    for bad in (
+        "",
+        "not pem",
+        "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----",
+        pem(pki.root) + key_pem,
+        pem(pki.root) * 20,
+        "A" * 100_000,
+    ):
         with pytest.raises(CertError):
             load_certificates(bad)
     summary = summarize(load_certificates(pem(pki.identity_cert(HOST)))[0])

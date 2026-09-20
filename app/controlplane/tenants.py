@@ -23,7 +23,13 @@ from app.ingestion.safe_fetch import FetchError
 from app.ingestion.scraper_service import Crawler
 from app.logging_config import get_logger
 from app.models.db import AgentConfig, Database, ImportJob, ImportStatus, Tenant, TenantState, utcnow
-from app.models.schemas import BusinessProfile, ProfileConfirmInput, TenantCreateInput, bump_patch, canonical_json
+from app.models.schemas import (
+    BusinessProfile,
+    ProfileConfirmInput,
+    TenantCreateInput,
+    bump_patch,
+    canonical_json,
+)
 from app.security import audit
 from app.security.breakers import Feature, require
 from app.security.hosts import HostPolicyError, agent_host_for_label
@@ -49,25 +55,44 @@ class TenantView:
 
 
 class TenantService:
-    def __init__(self, db: Database, settings: Settings, registry: AgentRegistry, limiter: RateLimiter, crawler: Crawler,
-                 llm: LLMClient | None) -> None:
+    def __init__(
+        self,
+        db: Database,
+        settings: Settings,
+        registry: AgentRegistry,
+        limiter: RateLimiter,
+        crawler: Crawler,
+        llm: LLMClient | None,
+    ) -> None:
         self._db, self._settings, self._registry = db, settings, registry
         self._limiter, self._crawler, self._llm = limiter, crawler, llm
 
     # ------------------------------------------------------------------ reads (owner-scoped)
     async def list_for(self, owner_id: uuid.UUID) -> list[Tenant]:
         async with self._db.session() as session:
-            rows = await session.execute(select(Tenant).where(Tenant.owner_id == owner_id).order_by(Tenant.created_at.desc()))
+            rows = await session.execute(
+                select(Tenant).where(Tenant.owner_id == owner_id).order_by(Tenant.created_at.desc())
+            )
             return list(rows.scalars())
 
     async def view(self, owner_id: uuid.UUID, tenant_id: uuid.UUID) -> TenantView:
         async with self._db.session() as session:
-            tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id))).scalar_one_or_none()
+            tenant = (
+                await session.execute(
+                    select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id)
+                )
+            ).scalar_one_or_none()
             if tenant is None:
                 raise TenantError("not_found", "No such agent.", 404)
-            configs = list((await session.execute(select(AgentConfig).where(AgentConfig.tenant_id == tenant_id))).scalars())
+            configs = list(
+                (
+                    await session.execute(select(AgentConfig).where(AgentConfig.tenant_id == tenant_id))
+                ).scalars()
+            )
         draft = next((c for c in configs if c.published_at is None), None)
-        published = next((c for c in configs if c.published_at is not None and c.version == tenant.current_version), None)
+        published = next(
+            (c for c in configs if c.published_at is not None and c.version == tenant.current_version), None
+        )
         return TenantView(tenant, draft, published)
 
     # ------------------------------------------------------------------ create
@@ -80,18 +105,33 @@ class TenantService:
         if agent_host in (self._settings.desk_host, self._settings.demo_host):
             raise TenantError("label_reserved", "that subdomain is reserved", 422)
         async with self._db.session() as session:
-            count = len(list((await session.execute(select(Tenant.id).where(Tenant.owner_id == owner_id))).scalars()))
+            count = len(
+                list((await session.execute(select(Tenant.id).where(Tenant.owner_id == owner_id))).scalars())
+            )
             if count >= MAX_TENANTS_PER_OWNER:
                 raise TenantError("tenant_quota", "Agent limit reached for this account.", 429)
-            tenant = Tenant(owner_id=owner_id, display_name=data.display_name, source_url=data.source_url,
-                            source_domain=(urlsplit(data.source_url).hostname or "").lower(), agent_host=agent_host)
+            tenant = Tenant(
+                owner_id=owner_id,
+                display_name=data.display_name,
+                source_url=data.source_url,
+                source_domain=(urlsplit(data.source_url).hostname or "").lower(),
+                agent_host=agent_host,
+            )
             session.add(tenant)
             try:
                 await session.flush()
             except IntegrityError as exc:
                 raise TenantError("host_taken", "That agent hostname is already in use.", 409) from exc
-            await audit.record(session, action=audit.TENANT_CREATE, outcome="ok", actor_type="user", actor_id=str(owner_id),
-                               target_type="tenant", target_id=str(tenant.id), metadata={"agent_host": agent_host})
+            await audit.record(
+                session,
+                action=audit.TENANT_CREATE,
+                outcome="ok",
+                actor_type="user",
+                actor_id=str(owner_id),
+                target_type="tenant",
+                target_id=str(tenant.id),
+                metadata={"agent_host": agent_host},
+            )
             await session.commit()
             return tenant
 
@@ -104,12 +144,22 @@ class TenantService:
         if not await self._limiter.acquire_once("import-active", owner, 180):
             raise TenantError("import_in_progress", "An import is already running for this account.", 409)
         try:
-            await self._limiter.enforce("import", owner, limit=self._settings.rl_import_per_hour, window_s=3600)
+            await self._limiter.enforce(
+                "import", owner, limit=self._settings.rl_import_per_hour, window_s=3600
+            )
             async with self._db.session() as session:
                 job = ImportJob(tenant_id=tenant_id, owner_id=owner_id)
                 session.add(job)
-                await audit.record(session, action=audit.IMPORT_START, outcome="ok", actor_type="user", actor_id=owner,
-                                   target_type="tenant", target_id=str(tenant_id), metadata={"source_domain": view.tenant.source_domain})
+                await audit.record(
+                    session,
+                    action=audit.IMPORT_START,
+                    outcome="ok",
+                    actor_type="user",
+                    actor_id=owner,
+                    target_type="tenant",
+                    target_id=str(tenant_id),
+                    metadata={"source_domain": view.tenant.source_domain},
+                )
                 await session.commit()
             try:
                 crawl = await self._crawler.crawl(view.tenant.source_url)
@@ -117,35 +167,71 @@ class TenantService:
             except (SSRFBlocked, FetchError, ExtractionFailed) as exc:
                 await self._finish_job(job.id, ImportStatus.FAILED, error=exc.code)
                 blocked = isinstance(exc, SSRFBlocked)
-                await audit.record_independent(self._db, action=audit.SSRF_BLOCKED if blocked else audit.IMPORT_FAILED, outcome="blocked" if blocked else "error",
-                                               actor_type="user", actor_id=owner, target_type="tenant", target_id=str(tenant_id), metadata={"code": exc.code})
+                await audit.record_independent(
+                    self._db,
+                    action=audit.SSRF_BLOCKED if blocked else audit.IMPORT_FAILED,
+                    outcome="blocked" if blocked else "error",
+                    actor_type="user",
+                    actor_id=owner,
+                    target_type="tenant",
+                    target_id=str(tenant_id),
+                    metadata={"code": exc.code},
+                )
                 raise TenantError(exc.code, "The website could not be imported safely.", 422) from exc
             await self._store_draft(view.tenant, result, crawl.bytes_fetched)
-            await self._finish_job(job.id, ImportStatus.DONE, pages=len(crawl.pages), size=crawl.bytes_fetched, mode=result.mode)
+            await self._finish_job(
+                job.id, ImportStatus.DONE, pages=len(crawl.pages), size=crawl.bytes_fetched, mode=result.mode
+            )
             return result
         finally:
             await self._limiter.release("import-active", owner)
 
-    async def _finish_job(self, job_id: uuid.UUID, status: ImportStatus, *, error: str | None = None, pages: int = 0,
-                          size: int = 0, mode: str = "") -> None:
+    async def _finish_job(
+        self,
+        job_id: uuid.UUID,
+        status: ImportStatus,
+        *,
+        error: str | None = None,
+        pages: int = 0,
+        size: int = 0,
+        mode: str = "",
+    ) -> None:
         async with self._db.session() as session:
             job = (await session.execute(select(ImportJob).where(ImportJob.id == job_id))).scalar_one()
             job.status, job.error_code, job.pages_fetched, job.bytes_fetched = status, error, pages, size
             job.extraction_mode, job.finished_at = mode, utcnow()
             if status is ImportStatus.DONE:
-                await audit.record(session, action=audit.IMPORT_DONE, outcome="ok", target_type="tenant", target_id=str(job.tenant_id),
-                                   metadata={"pages": pages, "bytes": size, "mode": mode})
+                await audit.record(
+                    session,
+                    action=audit.IMPORT_DONE,
+                    outcome="ok",
+                    target_type="tenant",
+                    target_id=str(job.tenant_id),
+                    metadata={"pages": pages, "bytes": size, "mode": mode},
+                )
             await session.commit()
 
     async def _store_draft(self, tenant: Tenant, result: ExtractionResult, size: int) -> None:
         """Only the normalized profile is stored — never the fetched HTML."""
         profile = result.output.profile
-        version = bump_patch(tenant.current_version) if tenant.current_version else self._settings.ans_agent_version
-        source_hash = hashlib.sha256(canonical_json({"urls": profile.source_urls, "bytes": size}).encode()).hexdigest()
+        version = (
+            bump_patch(tenant.current_version) if tenant.current_version else self._settings.ans_agent_version
+        )
+        source_hash = hashlib.sha256(
+            canonical_json({"urls": profile.source_urls, "bytes": size}).encode()
+        ).hexdigest()
         async with self._db.session() as session:
-            draft = (await session.execute(select(AgentConfig).where(AgentConfig.tenant_id == tenant.id, AgentConfig.published_at.is_(None)))).scalar_one_or_none()
+            draft = (
+                await session.execute(
+                    select(AgentConfig).where(
+                        AgentConfig.tenant_id == tenant.id, AgentConfig.published_at.is_(None)
+                    )
+                )
+            ).scalar_one_or_none()
             if draft is None:
-                draft = AgentConfig(tenant_id=tenant.id, version=version, profile={}, allowed_capabilities=[], content_hash="")
+                draft = AgentConfig(
+                    tenant_id=tenant.id, version=version, profile={}, allowed_capabilities=[], content_hash=""
+                )
                 session.add(draft)
             draft.version, draft.profile = version, profile.model_dump(mode="json")
             draft.allowed_capabilities = [c.value for c in result.output.capabilities]
@@ -156,34 +242,61 @@ class TenantService:
             await session.commit()
 
     # ------------------------------------------------------------------ confirm + publish
-    async def confirm_and_publish(self, owner_id: uuid.UUID, tenant_id: uuid.UUID, data: ProfileConfirmInput) -> AgentConfig:
+    async def confirm_and_publish(
+        self, owner_id: uuid.UUID, tenant_id: uuid.UUID, data: ProfileConfirmInput
+    ) -> AgentConfig:
         require(self._settings, Feature.WRITES)
         view = await self.view(owner_id, tenant_id)
         if view.draft is None:
             raise TenantError("no_draft", "Import the website before publishing.", 409)
         if view.tenant.state in (TenantState.DISABLED, TenantState.REVOKED):
             raise TenantError("tenant_disabled", "This agent is disabled.", 409)
-        profile: BusinessProfile = data.profile.model_copy(update={"source_urls": view.draft.profile.get("source_urls", [])})
+        profile: BusinessProfile = data.profile.model_copy(
+            update={"source_urls": view.draft.profile.get("source_urls", [])}
+        )
         supported = set(profile.derived_capabilities())
-        capabilities = [c for c in data.capabilities if c in supported]  # can only narrow what the content supports
+        capabilities = [
+            c for c in data.capabilities if c in supported
+        ]  # can only narrow what the content supports
         if not capabilities:
             raise TenantError("no_capabilities", "Select at least one capability the content supports.", 422)
         async with self._db.session() as session:
-            tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id))).scalar_one()
+            tenant = (
+                await session.execute(
+                    select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id)
+                )
+            ).scalar_one()
             if tenant.row_version != data.row_version:
-                raise TenantError("stale_version", "This agent changed in another session. Reload and try again.", 409)
-            draft = (await session.execute(select(AgentConfig).where(AgentConfig.id == view.draft.id))).scalar_one()
-            draft.profile, draft.allowed_capabilities = profile.model_dump(mode="json"), [c.value for c in capabilities]
+                raise TenantError(
+                    "stale_version", "This agent changed in another session. Reload and try again.", 409
+                )
+            draft = (
+                await session.execute(select(AgentConfig).where(AgentConfig.id == view.draft.id))
+            ).scalar_one()
+            draft.profile, draft.allowed_capabilities = (
+                profile.model_dump(mode="json"),
+                [c.value for c in capabilities],
+            )
             draft.content_hash, draft.published_at = profile.content_hash(), utcnow()
             tenant.current_version, tenant.display_name = draft.version, profile.business_name
             if tenant.state in (TenantState.DRAFT, TenantState.INGESTED, TenantState.FAILED):
                 tenant.state = TenantState.DEPLOYED
-            await audit.record(session, action=audit.CONFIG_PUBLISH, outcome="ok", actor_type="user", actor_id=str(owner_id), target_type="tenant",
-                               target_id=str(tenant_id), metadata={"version": draft.version, "content_hash": draft.content_hash})
+            await audit.record(
+                session,
+                action=audit.CONFIG_PUBLISH,
+                outcome="ok",
+                actor_type="user",
+                actor_id=str(owner_id),
+                target_type="tenant",
+                target_id=str(tenant_id),
+                metadata={"version": draft.version, "content_hash": draft.content_hash},
+            )
             try:
                 await session.commit()
             except StaleDataError as exc:
-                raise TenantError("stale_version", "This agent changed in another session. Reload and try again.", 409) from exc
+                raise TenantError(
+                    "stale_version", "This agent changed in another session. Reload and try again.", 409
+                ) from exc
         self._registry.invalidate(view.tenant.agent_host)
         return draft
 
@@ -191,9 +304,20 @@ class TenantService:
         require(self._settings, Feature.WRITES)
         view = await self.view(owner_id, tenant_id)
         async with self._db.session() as session:
-            tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id))).scalar_one()
+            tenant = (
+                await session.execute(
+                    select(Tenant).where(Tenant.id == tenant_id, Tenant.owner_id == owner_id)
+                )
+            ).scalar_one()
             tenant.state = TenantState.DISABLED
-            await audit.record(session, action=audit.TENANT_DISABLE, outcome="ok", actor_type="user", actor_id=str(owner_id),
-                               target_type="tenant", target_id=str(tenant_id))
+            await audit.record(
+                session,
+                action=audit.TENANT_DISABLE,
+                outcome="ok",
+                actor_type="user",
+                actor_id=str(owner_id),
+                target_type="tenant",
+                target_id=str(tenant_id),
+            )
             await session.commit()
         self._registry.invalidate(view.tenant.agent_host)

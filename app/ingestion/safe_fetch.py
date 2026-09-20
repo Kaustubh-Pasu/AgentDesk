@@ -21,7 +21,14 @@ from app.ingestion import policy
 from app.ingestion.html_extract import ExtractedPage, extract_html, extract_plain
 from app.logging_config import get_logger
 from app.security.breakers import Feature, require
-from app.security.ssrf import IMPORT_URL_POLICY, SafeClientConfig, SSRFBlocked, build_safe_client, read_capped, validate_url
+from app.security.ssrf import (
+    IMPORT_URL_POLICY,
+    SafeClientConfig,
+    SSRFBlocked,
+    build_safe_client,
+    read_capped,
+    validate_url,
+)
 from app.settings import Settings
 
 log = get_logger("ingestion.fetch")
@@ -53,13 +60,17 @@ class SafeFetcher:
         async with build_safe_client(self._config) as client:
             for _hop in range(policy.MAX_REDIRECTS + 1):
                 try:
-                    async with client.stream("GET", current, headers={"Accept": "text/html, text/plain;q=0.8"}) as response:
+                    async with client.stream(
+                        "GET", current, headers={"Accept": "text/html, text/plain;q=0.8"}
+                    ) as response:
                         if response.status_code in (301, 302, 303, 307, 308):
                             location = response.headers.get("location", "")
                             if not location:
                                 raise FetchError("redirect_invalid", "redirect without Location")
                             # full URL policy on every hop; DNS/IP policy is re-applied by the transport on connect
-                            current = validate_url(str(response.url.join(location)).split("#", 1)[0], self._config.url_policy).url
+                            current = validate_url(
+                                str(response.url.join(location)).split("#", 1)[0], self._config.url_policy
+                            ).url
                             continue
                         if response.status_code != 200:
                             raise FetchError("http_status", f"HTTP {response.status_code}")
@@ -88,7 +99,9 @@ class SafeFetcher:
                 result.skipped.append((url, "budget_exhausted"))
                 break
             try:
-                final_url, media_type, body = await asyncio.wait_for(self.fetch(url, budget=remaining_bytes), remaining_time)
+                final_url, media_type, body = await asyncio.wait_for(
+                    self.fetch(url, budget=remaining_bytes), remaining_time
+                )
             except (SSRFBlocked, FetchError) as exc:
                 if not result.pages and depth == 0:
                     raise  # the start page itself failed: surface the precise safe code to the owner
@@ -108,12 +121,17 @@ class SafeFetcher:
                 result.skipped.append((url, "redirect_off_site"))
                 continue
             result.bytes_fetched += len(body)
-            page = extract_html(body, final_url) if media_type == "text/html" else extract_plain(body, final_url)
+            page = (
+                extract_html(body, final_url) if media_type == "text/html" else extract_plain(body, final_url)
+            )
             result.pages.append(page)
             if depth < policy.MAX_DEPTH:
                 for link in page.links:
                     if link not in seen and len(seen) < policy.MAX_PAGES * 6:
                         seen.add(link)
                         queue.append((link, depth + 1))
-        log.info("crawl finished", extra={"pages": len(result.pages), "bytes": result.bytes_fetched, "skipped": len(result.skipped)})
+        log.info(
+            "crawl finished",
+            extra={"pages": len(result.pages), "bytes": result.bytes_fetched, "skipped": len(result.skipped)},
+        )
         return result

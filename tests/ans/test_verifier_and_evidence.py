@@ -17,7 +17,14 @@ from app.agents.runtime import AgentRuntime
 from app.agents.seed import seed_demo_agent
 from app.ans.certs import TrustAnchors, fingerprint_sha256
 from app.ans.client import AnsClient
-from app.ans.evidence import ProofService, SecretLeak, assert_no_secrets, build_proof, gate_summary, write_evidence_bundle
+from app.ans.evidence import (
+    ProofService,
+    SecretLeak,
+    assert_no_secrets,
+    build_proof,
+    gate_summary,
+    write_evidence_bundle,
+)
 from app.ans.verifier import Verifier, make_tls_probe
 from app.models.db import AuditEvent, BlockedAgent, Database
 from app.models.schemas import TlsEvidence
@@ -35,7 +42,9 @@ PUBLIC_IP = "93.184.216.34"
 
 
 async def fake_tls(host: str) -> TlsEvidence:
-    return TlsEvidence(status="PASS", detail="test probe", version="TLSv1.3", hostname_verified=True, leaf_sha256="ab" * 32)
+    return TlsEvidence(
+        status="PASS", detail="test probe", version="TLSv1.3", hostname_verified=True, leaf_sha256="ab" * 32
+    )
 
 
 @dataclass
@@ -46,11 +55,19 @@ class World:
     port: int
     agent_id: str
 
-    def verifier(self, *, anchors: TrustAnchors | None = None, resolver: FakeResolver | None = None, settings=None) -> Verifier:  # type: ignore[no-untyped-def]
+    def verifier(
+        self, *, anchors: TrustAnchors | None = None, resolver: FakeResolver | None = None, settings=None
+    ) -> Verifier:  # type: ignore[no-untyped-def]
         s = settings or self.settings
-        return Verifier(s, AnsClient(s, transport=self.ans.transport, backoff_s=0),  # type: ignore[arg-type]
-                        LoopbackRemoteHttp(s, self.port, [DEMO]), self.db, anchors=anchors,  # type: ignore[arg-type]
-                        resolver=resolver or FakeResolver({DEMO: [PUBLIC_IP]}), tls_probe=fake_tls)
+        return Verifier(
+            s,
+            AnsClient(s, transport=self.ans.transport, backoff_s=0),  # type: ignore[arg-type]
+            LoopbackRemoteHttp(s, self.port, [DEMO]),
+            self.db,
+            anchors=anchors,  # type: ignore[arg-type]
+            resolver=resolver or FakeResolver({DEMO: [PUBLIC_IP]}),
+            tls_probe=fake_tls,
+        )
 
 
 @asynccontextmanager
@@ -88,7 +105,11 @@ async def test_active_agent_verifies_with_honest_incompletes(db: Database, tmp_p
     checks = by_id(result)
     assert len(checks) == 15
     assert result.verified and result.decision == "PASS"
-    assert result.ans.status == "ACTIVE" and result.ans.environment == "production" and result.ans.agent_id == w.agent_id
+    assert (
+        result.ans.status == "ACTIVE"
+        and result.ans.environment == "production"
+        and result.ans.agent_id == w.agent_id
+    )
     assert result.a2a.card_valid and "get_hours" in result.a2a.skills and len(result.a2a.card_sha256) == 64
     assert result.mcp.handshake and result.mcp.probe_ok and "get_business_info" in result.mcp.tools
     # no certificate for this agent + no trust anchor: those checks are INCOMPLETE, never PASS
@@ -104,11 +125,18 @@ async def test_identity_certificate_chain_and_binding(db: Database, tmp_path, pk
     anchors = TrustAnchors.load(str(bundle), set())
     async with world(db, tmp_path) as w:
         leaf = pki.identity_cert(DEMO)
-        w.ans.certs[w.agent_id] = {"identity": [{"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate) + pem(pki.root), "csrId": "x"}]}
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate) + pem(pki.root), "csrId": "x"}
+            ]
+        }
         w.ans.identity_fingerprints[w.agent_id] = "SHA256:" + fingerprint_sha256(leaf)
         good = await w.verifier(anchors=anchors).verify(DEMO)
         assert good.verified and good.identity_certificate is not None
-        assert good.identity_certificate.chain_status == "PASS" and good.identity_certificate.binding_status == "PASS"
+        assert (
+            good.identity_certificate.chain_status == "PASS"
+            and good.identity_certificate.binding_status == "PASS"
+        )
         assert f"URI:ans://v1.0.0.{DEMO}" in good.identity_certificate.san
 
         no_anchor = await w.verifier().verify(DEMO)
@@ -117,15 +145,33 @@ async def test_identity_certificate_chain_and_binding(db: Database, tmp_path, pk
         # registry-supplied chain from a DIFFERENT root must not be trusted just because it was sent along
         attacker = FakePKI("Attacker")
         forged = attacker.identity_cert(DEMO)
-        w.ans.certs[w.agent_id] = {"identity": [{"certificatePEM": pem(forged), "chainPEM": pem(attacker.intermediate) + pem(attacker.root), "csrId": "x"}]}
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {
+                    "certificatePEM": pem(forged),
+                    "chainPEM": pem(attacker.intermediate) + pem(attacker.root),
+                    "csrId": "x",
+                }
+            ]
+        }
         w.ans.identity_fingerprints[w.agent_id] = "SHA256:" + fingerprint_sha256(forged)
         bad = await w.verifier(anchors=anchors).verify(DEMO)
         assert not bad.verified and by_id(bad)["identity_chain_trust_anchor"] == "FAIL"
 
         # certificate for another host / fingerprint not attested by the transparency log
-        w.ans.certs[w.agent_id] = {"identity": [{"certificatePEM": pem(pki.identity_cert("evil." + BASE)), "chainPEM": pem(pki.intermediate), "csrId": "x"}]}
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {
+                    "certificatePEM": pem(pki.identity_cert("evil." + BASE)),
+                    "chainPEM": pem(pki.intermediate),
+                    "csrId": "x",
+                }
+            ]
+        }
         assert by_id(await w.verifier(anchors=anchors).verify(DEMO))["identity_certificate_binding"] == "FAIL"
-        w.ans.certs[w.agent_id] = {"identity": [{"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate), "csrId": "x"}]}
+        w.ans.certs[w.agent_id] = {
+            "identity": [{"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate), "csrId": "x"}]
+        }
         w.ans.identity_fingerprints[w.agent_id] = "SHA256:" + "00" * 32
         assert by_id(await w.verifier(anchors=anchors).verify(DEMO))["identity_certificate_binding"] == "FAIL"
 
@@ -161,11 +207,17 @@ async def test_registry_outage_is_incomplete_not_pass(db: Database, tmp_path) ->
 @pytest.mark.parametrize(
     ("mutate", "check"),
     [
-        (lambda a: a["endpoints"][0].update(agentUrl="https://evil.example.com/a2a"), "endpoint_host_binding"),
+        (
+            lambda a: a["endpoints"][0].update(agentUrl="https://evil.example.com/a2a"),
+            "endpoint_host_binding",
+        ),
         (lambda a: a["endpoints"][0].update(agentUrl=f"http://{DEMO}/a2a"), "endpoints_https"),
         (lambda a: a["endpoints"][0].update(agentUrl=f"https://{DEMO}/other-rpc"), "metadata_schema"),
         (lambda a: a["endpoints"][1].update(agentUrl=f"https://{DEMO}:8443/mcp"), "endpoint_network_policy"),
-        (lambda a: a.update(endpoints=[{"agentUrl": f"https://{DEMO}/api", "protocol": "HTTP-API"}]), "supported_protocol"),
+        (
+            lambda a: a.update(endpoints=[{"agentUrl": f"https://{DEMO}/api", "protocol": "HTTP-API"}]),
+            "supported_protocol",
+        ),
         (lambda a: a.update(ansName="ans://v1.0.0.someone-else.org"), "canonical_agent_host"),
         (lambda a: a["endpoints"][0].update(metaDataHash="sha256:" + "11" * 32), "metadata_integrity"),
     ],
@@ -217,7 +269,11 @@ async def test_card_drift_audits_and_forces_reverification(db: Database, tmp_pat
         drifted = await w.verifier().verify(DEMO)
         assert not drifted.verified and drifted.a2a.drift and by_id(drifted)["card_hash_drift"] == "FAIL"
         async with db.session() as session:
-            events = [e for e in (await session.execute(select(AuditEvent))).scalars() if e.action == "verify.card_drift"]
+            events = [
+                e
+                for e in (await session.execute(select(AuditEvent))).scalars()
+                if e.action == "verify.card_drift"
+            ]
             assert len(events) == 1 and events[0].meta["previous"] == "f" * 64
         assert (await w.verifier().verify(DEMO)).verified  # full re-verification against the new card
 
@@ -231,7 +287,9 @@ async def test_local_blocklist_wins(db: Database, tmp_path) -> None:  # type: ig
     assert not result.verified and by_id(result)["local_blocklist"] == "FAIL"
 
 
-@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "demo.agentdesk-demo.org/../x", "a" * 300, "exa mple.com", ""])
+@pytest.mark.parametrize(
+    "host", ["127.0.0.1", "localhost", "demo.agentdesk-demo.org/../x", "a" * 300, "exa mple.com", ""]
+)
 async def test_bad_host_input_fails_cleanly(db: Database, tmp_path, host: str) -> None:  # type: ignore[no-untyped-def]
     async with world(db, tmp_path) as w:
         result = await w.verifier().verify(host)
@@ -248,14 +306,23 @@ async def test_proof_document_gates_and_redaction(db: Database, tmp_path) -> Non
         gates = {g["gate"]: g["status"] for g in proof["gates"]}
         assert gates == {1: "PASS", 2: "PASS", 3: "PASS", 4: "PASS", 5: "PASS"}
         text = json.dumps(proof)
-        assert PAT not in text and "PRIVATE KEY" not in text and w.settings.session_secret.get_secret_value() not in text  # type: ignore[attr-defined]
+        assert (
+            PAT not in text
+            and "PRIVATE KEY" not in text
+            and w.settings.session_secret.get_secret_value() not in text
+        )  # type: ignore[attr-defined]
         path = write_evidence_bundle(proof, tmp_path / "artifacts", name="proof-demo")
         assert json.loads(path.read_text())["agent_host"] == DEMO
 
         w.ans.agents.clear()
         unregistered = build_proof(await w.verifier().verify(DEMO), w.settings)  # type: ignore[arg-type]
         gates = {g["gate"]: g["status"] for g in unregistered["gates"]}
-        assert gates[1] == "PASS" and gates[4] == "INCOMPLETE" and gates[5] == "FAIL" and gates[3] == "INCOMPLETE"
+        assert (
+            gates[1] == "PASS"
+            and gates[4] == "INCOMPLETE"
+            and gates[5] == "FAIL"
+            and gates[3] == "INCOMPLETE"
+        )
 
 
 async def test_ote_active_is_not_gate4_pass(db: Database, tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -267,17 +334,29 @@ async def test_ote_active_is_not_gate4_pass(db: Database, tmp_path) -> None:  # 
 
 
 def test_placeholder_domain_never_passes_gate3() -> None:
-    from app.models.schemas import AnsEvidence, VerificationResult
     from app.models.db import utcnow
+    from app.models.schemas import AnsEvidence, VerificationResult
 
     settings = make_settings()
-    result = VerificationResult(agent_host="demo.example.test", generated_at=utcnow(), tls=TlsEvidence(status="PASS"),
-                                ans=AnsEvidence(status="ACTIVE", environment="production"))
+    result = VerificationResult(
+        agent_host="demo.example.test",
+        generated_at=utcnow(),
+        tls=TlsEvidence(status="PASS"),
+        ans=AnsEvidence(status="ACTIVE", environment="production"),
+    )
     assert gate_summary(result, settings)[2]["status"] == "INCOMPLETE"
 
 
-@pytest.mark.parametrize("leak", ["-----BEGIN RSA PRIVATE KEY-----\nabc", "Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345",
-                                  "gd_pat_abcdef123456", "sso-key k3y:s3cret", "test-session-secret-0123456789abcdef0123456789"])
+@pytest.mark.parametrize(
+    "leak",
+    [
+        "-----BEGIN RSA PRIVATE KEY-----\nabc",
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345",
+        "gd_pat_abcdef123456",
+        "sso-key k3y:s3cret",
+        "test-session-secret-0123456789abcdef0123456789",
+    ],
+)
 def test_secret_shaped_evidence_is_refused(leak: str) -> None:
     with pytest.raises(SecretLeak):
         assert_no_secrets(json.dumps({"note": leak}), make_settings())

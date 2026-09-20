@@ -15,8 +15,59 @@ from app.models.schemas import clean_text
 MAX_KEYWORDS = 12
 _WORD = re.compile(r"[a-z0-9][a-z0-9'\-]{1,30}")
 _STOP = frozenset(
-    "a an and any are agent agents ai bot can could do does find for from get give have help i in is it know knows looking "
-    "me my need of on or please search some someone something tell that the there to want what where which who with you".split())
+    [
+        "a",
+        "an",
+        "and",
+        "any",
+        "are",
+        "agent",
+        "agents",
+        "ai",
+        "bot",
+        "can",
+        "could",
+        "do",
+        "does",
+        "find",
+        "for",
+        "from",
+        "get",
+        "give",
+        "have",
+        "help",
+        "i",
+        "in",
+        "is",
+        "it",
+        "know",
+        "knows",
+        "looking",
+        "me",
+        "my",
+        "need",
+        "of",
+        "on",
+        "or",
+        "please",
+        "search",
+        "some",
+        "someone",
+        "something",
+        "tell",
+        "that",
+        "the",
+        "there",
+        "to",
+        "want",
+        "what",
+        "where",
+        "which",
+        "who",
+        "with",
+        "you",
+    ]
+)
 
 
 class IntentTag(enum.StrEnum):
@@ -32,10 +83,16 @@ class IntentTag(enum.StrEnum):
 _TAG_WORDS: dict[IntentTag, frozenset[str]] = {
     IntentTag.HOURS: frozenset({"hours", "open", "opening", "closing", "schedule"}),
     IntentTag.LOCATION: frozenset({"address", "location", "directions", "near", "nearby"}),
-    IntentTag.MENU: frozenset({"menu", "food", "coffee", "cafe", "restaurant", "pizza", "bakery", "drinks", "lunch", "dinner"}),
-    IntentTag.SERVICES: frozenset({"services", "service", "pricing", "prices", "catering", "repair", "booking", "consulting"}),
+    IntentTag.MENU: frozenset(
+        {"menu", "food", "coffee", "cafe", "restaurant", "pizza", "bakery", "drinks", "lunch", "dinner"}
+    ),
+    IntentTag.SERVICES: frozenset(
+        {"services", "service", "pricing", "prices", "catering", "repair", "booking", "consulting"}
+    ),
     IntentTag.BUSINESS_INFO: frozenset({"business", "company", "shop", "store", "contact", "phone", "faq"}),
-    IntentTag.VERIFICATION: frozenset({"verify", "verification", "trust", "identity", "certificate", "dns", "audit"}),
+    IntentTag.VERIFICATION: frozenset(
+        {"verify", "verification", "trust", "identity", "certificate", "dns", "audit"}
+    ),
 }
 
 

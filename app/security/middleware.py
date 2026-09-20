@@ -158,10 +158,9 @@ class BodyLimitMiddleware:
             await self.app(scope, receive, send)
             return
         for name, value in scope.get("headers", []):
-            if name == b"content-length":
-                if not value.isdigit() or int(value) > self.max_bytes:
-                    await _reject(send, 413, "payload_too_large", "Request body too large.")
-                    return
+            if name == b"content-length" and (not value.isdigit() or int(value) > self.max_bytes):
+                await _reject(send, 413, "payload_too_large", "Request body too large.")
+                return
         received = 0
         too_large = False
         response_started = False

@@ -161,7 +161,7 @@ def validate_url(raw: str, policy: UrlPolicy = IMPORT_URL_POLICY) -> ValidatedUr
             raise SSRFBlocked("port_not_allowed", "malformed port")
         port = int(port_part)
     else:
-        port = _DEFAULT_PORTS[scheme] if scheme in _DEFAULT_PORTS else -1
+        port = _DEFAULT_PORTS.get(scheme, -1)
     if port not in policy.allowed_ports:
         raise SSRFBlocked("port_not_allowed", str(port))
     if scheme in _DEFAULT_PORTS and port != _DEFAULT_PORTS[scheme] and port in _DEFAULT_PORTS.values():
@@ -289,7 +289,7 @@ async def system_resolver(host: str, port: int) -> list[str]:
         raise SSRFBlocked("dns_failure", "hostname did not resolve") from exc
     seen: list[str] = []
     for info in infos:
-        addr = info[4][0]
+        addr = str(info[4][0])
         if addr not in seen:
             seen.append(addr)
     return seen
@@ -336,7 +336,7 @@ class PinnedNetworkBackend(httpcore.AsyncNetworkBackend):
         self,
         host: str,
         port: int,
-        timeout: float | None = None,
+        timeout: float | None = None,  # noqa: ASYNC109 - signature is dictated by httpcore
         local_address: str | None = None,
         socket_options: Iterable[tuple[int, int, int | bytes]] | None = None,
     ) -> httpcore.AsyncNetworkStream:
@@ -345,7 +345,11 @@ class PinnedNetworkBackend(httpcore.AsyncNetworkBackend):
         for ip in addresses[:4]:
             try:
                 return await self._inner.connect_tcp(
-                    str(ip), port, timeout=timeout, local_address=local_address, socket_options=socket_options
+                    str(ip),
+                    port,
+                    timeout=timeout,
+                    local_address=local_address,
+                    socket_options=socket_options,  # type: ignore[arg-type]
                 )
             except (httpcore.ConnectError, httpcore.ConnectTimeout, OSError) as exc:
                 last_exc = exc

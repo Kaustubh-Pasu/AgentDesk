@@ -53,7 +53,9 @@ async def current_session(request: Request, db: Database, settings: Settings) ->
     return Principal(user=user, session=row)
 
 
-async def require_user(request: Request, db: Database, settings: Settings, *, role: Role | None = None) -> Principal:
+async def require_user(
+    request: Request, db: Database, settings: Settings, *, role: Role | None = None
+) -> Principal:
     principal = await current_session(request, db, settings)
     if principal is None:
         raise AuthRequired()

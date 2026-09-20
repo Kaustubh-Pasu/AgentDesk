@@ -26,7 +26,9 @@ log = get_logger("ans.evidence")
 
 _SECRET_SHAPES = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----|gd_pat_[A-Za-z0-9_\-]{6,}|\bsso-key\s+\S+:\S+|\bBearer\s+[A-Za-z0-9._\-]{16,}"
-    r"|__Host-agentdesk_session=", re.IGNORECASE)
+    r"|__Host-agentdesk_session=",
+    re.IGNORECASE,
+)
 _PLACEHOLDER_DOMAINS = frozenset({"localhost", "example.com", "example.test", "example.org"})
 
 
@@ -43,8 +45,13 @@ def assert_no_secrets(text: str, settings: Settings) -> None:
 
 
 def _gate(number: int, title: str, status: str, detail: str, **evidence: Any) -> dict[str, Any]:
-    return {"gate": number, "title": title, "status": status, "detail": detail,
-            "evidence": {k: v for k, v in evidence.items() if v not in (None, "", [])}}
+    return {
+        "gate": number,
+        "title": title,
+        "status": status,
+        "detail": detail,
+        "evidence": {k: v for k, v in evidence.items() if v not in (None, "", [])},
+    }
 
 
 def _both(a: Status, b: Status) -> Status:
@@ -59,12 +66,22 @@ def gate_summary(result: VerificationResult, settings: Settings) -> list[dict[st
     placeholder = settings.base_domain in _PLACEHOLDER_DOMAINS
     active_prod = ans.status == "ACTIVE" and ans.environment == "production"
     if placeholder or not own:
-        g3 = ("INCOMPLETE", "BASE_DOMAIN is a placeholder; set it to the MLH domain you own" if placeholder
-              else "host is not under BASE_DOMAIN")
+        g3 = (
+            "INCOMPLETE",
+            "BASE_DOMAIN is a placeholder; set it to the MLH domain you own"
+            if placeholder
+            else "host is not under BASE_DOMAIN",
+        )
     elif tls.status == "PASS" and ans.status == "ACTIVE":
-        g3 = ("PASS", "host is under BASE_DOMAIN, serves valid public TLS, and ANS validated control of its DNS (ACME DNS-01)")
+        g3 = (
+            "PASS",
+            "host is under BASE_DOMAIN, serves valid public TLS, and ANS validated control of its DNS (ACME DNS-01)",
+        )
     elif tls.status == "PASS":
-        g3 = ("INCOMPLETE", "host under BASE_DOMAIN serves valid public TLS; DNS control is proven once ANS reports ACTIVE")
+        g3 = (
+            "INCOMPLETE",
+            "host under BASE_DOMAIN serves valid public TLS; DNS control is proven once ANS reports ACTIVE",
+        )
     else:
         g3 = ("INCOMPLETE", "no live evidence yet that this host is publicly served")
     if active_prod:
@@ -76,35 +93,77 @@ def gate_summary(result: VerificationResult, settings: Settings) -> list[dict[st
     else:
         g4 = ("INCOMPLETE", "no ANS registration found by the live lookup")
     return [
-        _gate(1, "Reachable agent endpoint (A2A + MCP)", _both(result.a2a.status, result.mcp.status),
-              f"A2A: {result.a2a.detail or result.a2a.status}; MCP: {result.mcp.detail or result.mcp.status}",
-              agent_card=result.a2a.card_url, card_sha256=result.a2a.card_sha256, skills=result.a2a.skills,
-              mcp_url=result.mcp.url, mcp_tools=result.mcp.tools),
-        _gate(2, "Public HTTPS", tls.status, tls.detail, tls_version=tls.version, leaf_sha256=tls.leaf_sha256,
-              issuer=tls.issuer, not_after=tls.not_after.isoformat() if tls.not_after else None),
-        _gate(3, "Owned MLH domain", g3[0], g3[1], base_domain=None if placeholder else settings.base_domain, agent_host=host),
-        _gate(4, "Production ANS registration ACTIVE", g4[0], g4[1], agent_id=ans.agent_id, ans_name=ans.ans_name,
-              ans_status=ans.status, environment=ans.environment, checked_at=ans.checked_at.isoformat() if ans.checked_at else None),
-        _gate(5, "Verification evidence", result.decision,
-              "all mandatory checks passed" if result.verified else "; ".join(result.reasons[:3]) or "not verified",
-              checks_passed=sum(c.status == "PASS" for c in result.checks), checks_total=len(result.checks),
-              identity_sha256=result.identity_certificate.sha256 if result.identity_certificate else None),
+        _gate(
+            1,
+            "Reachable agent endpoint (A2A + MCP)",
+            _both(result.a2a.status, result.mcp.status),
+            f"A2A: {result.a2a.detail or result.a2a.status}; MCP: {result.mcp.detail or result.mcp.status}",
+            agent_card=result.a2a.card_url,
+            card_sha256=result.a2a.card_sha256,
+            skills=result.a2a.skills,
+            mcp_url=result.mcp.url,
+            mcp_tools=result.mcp.tools,
+        ),
+        _gate(
+            2,
+            "Public HTTPS",
+            tls.status,
+            tls.detail,
+            tls_version=tls.version,
+            leaf_sha256=tls.leaf_sha256,
+            issuer=tls.issuer,
+            not_after=tls.not_after.isoformat() if tls.not_after else None,
+        ),
+        _gate(
+            3,
+            "Owned MLH domain",
+            g3[0],
+            g3[1],
+            base_domain=None if placeholder else settings.base_domain,
+            agent_host=host,
+        ),
+        _gate(
+            4,
+            "Production ANS registration ACTIVE",
+            g4[0],
+            g4[1],
+            agent_id=ans.agent_id,
+            ans_name=ans.ans_name,
+            ans_status=ans.status,
+            environment=ans.environment,
+            checked_at=ans.checked_at.isoformat() if ans.checked_at else None,
+        ),
+        _gate(
+            5,
+            "Verification evidence",
+            result.decision,
+            "all mandatory checks passed"
+            if result.verified
+            else "; ".join(result.reasons[:3]) or "not verified",
+            checks_passed=sum(c.status == "PASS" for c in result.checks),
+            checks_total=len(result.checks),
+            identity_sha256=result.identity_certificate.sha256 if result.identity_certificate else None,
+        ),
     ]
 
 
 def build_proof(result: VerificationResult, settings: Settings) -> dict[str, Any]:
     """Public, redacted proof document. Raises ``SecretLeak`` rather than returning something unsafe."""
-    document = redact_obj({
-        "agent_host": result.agent_host,
-        "generated_at": result.generated_at.isoformat(),
-        "environment": settings.ans_environment,
-        "verified": result.verified,
-        "decision": result.decision,
-        "gates": gate_summary(result, settings),
-        "verification": result.model_dump(mode="json"),
-        "notes": ["Statuses are derived from live checks only; INCOMPLETE means 'could not be proven', never 'assumed fine'.",
-                  "An ANS identity identifies an agent; it does not make the agent's output trusted."],
-    })
+    document = redact_obj(
+        {
+            "agent_host": result.agent_host,
+            "generated_at": result.generated_at.isoformat(),
+            "environment": settings.ans_environment,
+            "verified": result.verified,
+            "decision": result.decision,
+            "gates": gate_summary(result, settings),
+            "verification": result.model_dump(mode="json"),
+            "notes": [
+                "Statuses are derived from live checks only; INCOMPLETE means 'could not be proven', never 'assumed fine'.",
+                "An ANS identity identifies an agent; it does not make the agent's output trusted.",
+            ],
+        }
+    )
     assert_no_secrets(json.dumps(document, default=str), settings)
     return document
 

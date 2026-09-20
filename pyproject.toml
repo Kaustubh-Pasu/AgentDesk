@@ -65,6 +65,10 @@ ignore = [
     "S101",   # asserts are fine in tests
     "B008",   # FastAPI Depends() defaults
     "RUF012", # mutable class attrs in pydantic/sqlalchemy models
+    "E501",   # line length is owned by `ruff format`; what remains are long strings/comments it will not split
+    "RUF001", # homoglyph/fullwidth characters are deliberate SSRF/IDNA test vectors
+    "RUF002", # typographic dashes/arrows in docstrings are intentional
+    "RUF003", # …and in comments
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -29,7 +29,9 @@ from app.security.hosts import HostPolicyError, validate_agent_host
 from app.security.ssrf import SSRFBlocked, canonical_hostname
 
 KeyKind = Literal["identity", "server"]
-IDENTITY_KEY_BITS = 2048  # portable across RA deployments (EC P-256 is rejected with 422 by some; see notes §6)
+IDENTITY_KEY_BITS = (
+    2048  # portable across RA deployments (EC P-256 is rejected with 422 by some; see notes §6)
+)
 SERVER_KEY_BITS = 2048  # the RA accepts RSA 2048 or 4096 ONLY for server CSRs
 _PEM_CERT = re.compile(rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", re.DOTALL)
 MAX_PEM_BYTES = 64 * 1024
@@ -135,7 +137,9 @@ class KeyStore:
 
     def csr_bundle(self, agent_host: str, version: str) -> CsrBundle:
         return CsrBundle(
-            identity_csr_pem=build_identity_csr(self.load_or_create(agent_host, version, "identity"), agent_host, version),
+            identity_csr_pem=build_identity_csr(
+                self.load_or_create(agent_host, version, "identity"), agent_host, version
+            ),
             server_csr_pem=build_server_csr(self.load_or_create(agent_host, version, "server"), agent_host),
         )
 
@@ -149,7 +153,7 @@ def load_certificates(pem: str | bytes, *, limit: int = MAX_CHAIN_CERTS) -> list
         raise CertError("pem_contains_private_key", "refusing to handle PEM that contains a private key")
     blocks = _PEM_CERT.findall(data)
     if not blocks or len(blocks) > limit:
-        raise CertError("pem_invalid", "expected 1..%d certificates" % limit)
+        raise CertError("pem_invalid", f"expected 1..{limit} certificates")
     try:
         return [x509.load_pem_x509_certificate(block) for block in blocks]
     except ValueError as exc:
@@ -171,7 +175,9 @@ def subject_alt_names(cert: x509.Certificate) -> list[str]:
     return names[:50]
 
 
-def check_binding(cert: x509.Certificate, host: str, version: str | None, *, now: datetime | None = None) -> tuple[Status, str]:
+def check_binding(
+    cert: x509.Certificate, host: str, version: str | None, *, now: datetime | None = None
+) -> tuple[Status, str]:
     """Validity window + hostname binding (+ ANS URI binding when ``version`` is given: identity certs)."""
     now = now or datetime.now(UTC)
     if now < cert.not_valid_before_utc:
@@ -211,13 +217,20 @@ class TrustAnchors:
         return cls(tuple(certs))
 
 
-def verify_chain(leaf: x509.Certificate, intermediates: list[x509.Certificate], anchors: TrustAnchors,
-                 *, now: datetime | None = None) -> tuple[Status, str]:
+def verify_chain(
+    leaf: x509.Certificate,
+    intermediates: list[x509.Certificate],
+    anchors: TrustAnchors,
+    *,
+    now: datetime | None = None,
+) -> tuple[Status, str]:
     if not anchors.certificates:
         return "INCOMPLETE", anchors.problem or "no trust anchor provisioned"
     anchor_prints = {fingerprint_sha256(c) for c in anchors.certificates}
     # Anything the other side supplied is at most an intermediate; supplied self-signed roots are ignored.
-    untrusted = [c for c in intermediates if fingerprint_sha256(c) not in anchor_prints and c.issuer != c.subject]
+    untrusted = [
+        c for c in intermediates if fingerprint_sha256(c) not in anchor_prints and c.issuer != c.subject
+    ]
     builder = PolicyBuilder().store(Store(list(anchors.certificates))).max_chain_depth(4)
     if now is not None:
         builder = builder.time(now)

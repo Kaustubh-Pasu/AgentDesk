@@ -31,15 +31,23 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _AGENT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]{0,127}\Z")
 _RETRY_STATUS = frozenset({429, 502, 503, 504})
 REVOCATION_REASONS = frozenset(
-    {"KEY_COMPROMISE", "CESSATION_OF_OPERATION", "AFFILIATION_CHANGED", "CERTIFICATE_HOLD", "PRIVILEGE_WITHDRAWN",
-     "AA_COMPROMISE"}
+    {
+        "KEY_COMPROMISE",
+        "CESSATION_OF_OPERATION",
+        "AFFILIATION_CHANGED",
+        "CERTIFICATE_HOLD",
+        "PRIVILEGE_WITHDRAWN",
+        "AA_COMPROMISE",
+    }
 )
 TERMINAL_STATUSES = frozenset({"ACTIVE", "FAILED", "EXPIRED", "REVOKED"})
 CONNECTABLE_STATUSES = frozenset({"ACTIVE"})
 
 
 class AnsApiError(Exception):
-    def __init__(self, status: int, code: str, message: str = "", details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, status: int, code: str, message: str = "", details: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(f"ANS API {status} {code}")
         self.status = status
         self.code = code[:64]
@@ -127,7 +135,9 @@ class AgentDetails(_Model):
         return v.get("status", "") if isinstance(v, dict) else v
 
     def pending_dns_records(self) -> list[DnsRecord]:
-        return self.dns_records or (self.registration_pending.dns_records if self.registration_pending else [])
+        return self.dns_records or (
+            self.registration_pending.dns_records if self.registration_pending else []
+        )
 
 
 class AgentStatus(_Model):
@@ -147,7 +157,9 @@ class RevocationResponse(_Model):
     agent_id: str = Field("", alias="agentId", max_length=128)
     status: str = Field("", max_length=40)
     revoked_at: str | None = Field(None, alias="revokedAt", max_length=64)
-    dns_records_to_remove: list[DnsRecord] = Field(default_factory=list, alias="dnsRecordsToRemove", max_length=20)
+    dns_records_to_remove: list[DnsRecord] = Field(
+        default_factory=list, alias="dnsRecordsToRemove", max_length=20
+    )
 
 
 class _Lifecycle(_Model):
@@ -224,8 +236,14 @@ def parse_timestamp(value: str | None) -> datetime | None:
 
 # --------------------------------------------------------------------------- client
 class AnsClient:
-    def __init__(self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None,
-                 max_retries: int = 2, backoff_s: float = 0.5) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+        max_retries: int = 2,
+        backoff_s: float = 0.5,
+    ) -> None:
         self._settings = settings
         self._transport = transport
         self._max_retries = min(max_retries, 2)
@@ -266,22 +284,43 @@ class AnsClient:
             pass
         return AnsApiError(response.status_code, code, message, details)
 
-    async def _call(self, method: str, path: str, *, auth: bool, params: dict[str, Any] | None = None,
-                    body: dict[str, Any] | None = None, retry: bool = False, base: str | None = None) -> Any:
-        headers = {"Accept": "application/json", "Content-Type": "application/json",
-                   "X-Request-Id": str(uuid.uuid4())}
+    async def _call(
+        self,
+        method: str,
+        path: str,
+        *,
+        auth: bool,
+        params: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+        retry: bool = False,
+        base: str | None = None,
+    ) -> Any:
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-Request-Id": str(uuid.uuid4()),
+        }
         if auth:
             headers["Authorization"] = self._auth_header()
         if base is not None and auth:
             raise AnsApiError(0, "CREDENTIAL_SCOPE")  # the credential only ever goes to the RA API origin
         url = f"{base or self._settings.godaddy_api_base}{path}"
         attempts = 1 + (self._max_retries if retry else 0)
-        async with httpx.AsyncClient(timeout=self._settings.ans_request_timeout_s, follow_redirects=False,
-                                     trust_env=False, transport=self._transport) as client:
+        async with httpx.AsyncClient(
+            timeout=self._settings.ans_request_timeout_s,
+            follow_redirects=False,
+            trust_env=False,
+            transport=self._transport,
+        ) as client:
             for attempt in range(attempts):
                 try:
-                    async with client.stream(method, url, headers=headers, params=params,
-                                             content=json.dumps(body).encode() if body is not None else None) as response:
+                    async with client.stream(
+                        method,
+                        url,
+                        headers=headers,
+                        params=params,
+                        content=json.dumps(body).encode() if body is not None else None,
+                    ) as response:
                         raw = b""
                         async for chunk in response.aiter_bytes():
                             raw += chunk
@@ -301,8 +340,14 @@ class AnsClient:
                     continue
                 if response.status_code not in (200, 202, 204):
                     error = self._error(response, raw)
-                    log.warning("ans api error", extra={"path_template": re.sub(r"[0-9a-f-]{36}", "{id}", path),
-                                                        "status": error.status, "code": error.code})
+                    log.warning(
+                        "ans api error",
+                        extra={
+                            "path_template": re.sub(r"[0-9a-f-]{36}", "{id}", path),
+                            "status": error.status,
+                            "code": error.code,
+                        },
+                    )
                     raise error
                 if not raw:
                     return {}
@@ -327,7 +372,9 @@ class AnsClient:
 
     # ------------------------------------------------------------------ lifecycle (authenticated)
     async def register(self, payload: dict[str, Any]) -> RegistrationPending:
-        return self._parse(RegistrationPending, await self._call("POST", "/v1/agents/register", auth=True, body=payload))
+        return self._parse(
+            RegistrationPending, await self._call("POST", "/v1/agents/register", auth=True, body=payload)
+        )
 
     async def get_agent(self, agent_id: str) -> AgentDetails:
         data = await self._call("GET", f"/v1/agents/{self._id(agent_id)}", auth=True, retry=True)
@@ -349,7 +396,9 @@ class AnsClient:
         return self._parse(RevocationResponse, data)
 
     async def _certs(self, agent_id: str, kind: str) -> list[CertificateResponse]:
-        data = await self._call("GET", f"/v1/agents/{self._id(agent_id)}/certificates/{kind}", auth=True, retry=True)
+        data = await self._call(
+            "GET", f"/v1/agents/{self._id(agent_id)}/certificates/{kind}", auth=True, retry=True
+        )
         if not isinstance(data, list):
             raise AnsApiError(200, "UNEXPECTED_RESPONSE_SHAPE")
         return [self._parse(CertificateResponse, item) for item in data[:10]]
@@ -371,8 +420,15 @@ class AnsClient:
         return [a for a in hits if a.agent_host.lower() == agent_host.lower()]  # API match may be partial
 
     # ------------------------------------------------------------------ public discovery (NO credential sent)
-    async def discover(self, *, query: str = "", agent_host: str = "", protocols: tuple[str, ...] = (),
-                       statuses: tuple[str, ...] = ("ACTIVE",), page_size: int = 10) -> list[DiscoveredAgent]:
+    async def discover(
+        self,
+        *,
+        query: str = "",
+        agent_host: str = "",
+        protocols: tuple[str, ...] = (),
+        statuses: tuple[str, ...] = ("ACTIVE",),
+        page_size: int = 10,
+    ) -> list[DiscoveredAgent]:
         body: dict[str, Any] = {"pageSize": max(1, min(page_size, 25)), "statuses": list(statuses)}
         if query:
             body["query"] = query[:256]
@@ -385,13 +441,20 @@ class AnsClient:
         return [self._parse(DiscoveredAgent, item) for item in items[:25] if isinstance(item, dict)]
 
     async def get_registered_agent(self, agent_id: str) -> DiscoveredAgent:
-        data = await self._call("GET", f"/v1/ans/registered-agents/{self._id(agent_id)}", auth=False, retry=True)
+        data = await self._call(
+            "GET", f"/v1/ans/registered-agents/{self._id(agent_id)}", auth=False, retry=True
+        )
         return self._parse(DiscoveredAgent, data)
 
     async def get_badge(self, agent_id: str) -> Badge:
         """Public Transparency-Log badge (the ANS revocation channel). No credential; fixed official origin."""
-        data = await self._call("GET", f"/v1/agents/{self._id(agent_id)}", auth=False, retry=True,
-                                base=self._settings.transparency_log_base)
+        data = await self._call(
+            "GET",
+            f"/v1/agents/{self._id(agent_id)}",
+            auth=False,
+            retry=True,
+            base=self._settings.transparency_log_base,
+        )
         if not isinstance(data, dict):
             raise AnsApiError(200, "UNEXPECTED_RESPONSE_SHAPE")
         return self._parse(Badge, Badge.from_wire(data).model_dump())
