@@ -14,7 +14,18 @@ import ipaddress
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 
-from app.security.ssrf import GlobalOnlyPolicy, IPAddress, SafeClientConfig, UrlPolicy
+from urllib.parse import urlsplit
+
+from app.protocols.remote_http import RemoteHttp
+from app.security.ssrf import (
+    REMOTE_AGENT_URL_POLICY,
+    GlobalOnlyPolicy,
+    IPAddress,
+    SafeClientConfig,
+    UrlPolicy,
+    validate_url,
+)
+from app.settings import Settings
 
 
 class LoopbackTestPolicy(GlobalOnlyPolicy):
@@ -166,3 +177,17 @@ def loopback_client_config(port: int, hosts: list[str]) -> SafeClientConfig:
         address_policy=LoopbackTestPolicy(port),
         resolver=FakeResolver({h: ["127.0.0.1"] for h in hosts}),
     )
+
+
+class LoopbackRemoteHttp(RemoteHttp):
+    """Test double for the network edge ONLY: ``https://<host>/x`` is served by the fixture at
+    ``http://<host>:<port>/x``. URL policy, pinned DNS, caps and parsing are the production code paths."""
+
+    def __init__(self, settings: Settings, port: int, hosts: list[str]) -> None:
+        super().__init__(settings, loopback_client_config(port, hosts))
+        self._port = port
+
+    async def _request(self, method: str, url: str, **kwargs: object):  # type: ignore[no-untyped-def,override]
+        validate_url(url, REMOTE_AGENT_URL_POLICY)  # the production policy still applies to the ORIGINAL url
+        parts = urlsplit(url)
+        return await super()._request(method, f"http://{parts.hostname}:{self._port}{parts.path or '/'}", **kwargs)  # type: ignore[arg-type]

@@ -221,6 +221,13 @@ class Settings(BaseSettings):
         return GODADDY_API_BASES[self.godaddy_api_base]
 
     @property
+    def transparency_log_base(self) -> str:
+        """Official ANS Transparency Log origin for the configured environment (fixed; never from remote data)."""
+        if self.ans_environment == "production":
+            return "https://transparency.ans.godaddy.com"
+        return "https://transparency.ans.ote-godaddy.com"
+
+    @property
     def ans_credential_configured(self) -> bool:
         if self.ans_auth_scheme == "bearer":
             return bool(self.godaddy_pat.get_secret_value())

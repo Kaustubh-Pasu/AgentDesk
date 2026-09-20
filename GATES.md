@@ -12,8 +12,8 @@ _Last updated: 2026-09-19 (build in progress — see "Build log" at the bottom).
 | 1 | Reachable agent endpoint (A2A + MCP) for Agent Desk **and** one generated business agent | `NOT_STARTED` | `LOCAL_READY` (protocol tests pass in-process and over a loopback socket) | public host (Gate 2/3) |
 | 2 | Public HTTPS URL | `WAITING_FOR_EXTERNAL_INPUT` | not started | a public VPS/host + DNS A records |
 | 3 | Owned MLH domain | `WAITING_FOR_EXTERNAL_INPUT` | not started | `BASE_DOMAIN` value (your MLH domain) |
-| 4 | Production GoDaddy credential + `gddy` CLI flow → ANS status `ACTIVE` | `WAITING_FOR_EXTERNAL_INPUT` | not started | production PAT / event credential, DNS control |
-| 5 | Verification evidence the demo can show (`/proof`, `/api/proof`) | `NOT_STARTED` | not started | Gates 1–4 live |
+| 4 | Production GoDaddy credential + `gddy` CLI flow → ANS status `ACTIVE` | `WAITING_FOR_EXTERNAL_INPUT` | `LOCAL_READY` (client + state machine tested against a fake of the documented API) | production PAT / event credential, DNS control |
+| 5 | Verification evidence the demo can show (`/proof`, `/api/proof`) | `NOT_STARTED` | `LOCAL_READY` (verifier + evidence tested locally) | Gates 1–4 live |
 
 ## What I need from you (only these; everything else proceeds without you)
 
@@ -35,3 +35,11 @@ records the command, timestamp, and redacted output._
   `LLM_PROVIDER=none`), A2A server on a2a-sdk 1.1.4 (Agent Card at `/.well-known/agent-card.json`, JSON-RPC at `/a2a`,
   1.0 + 0.3 compat), MCP Streamable HTTP on mcp 2.2.0 (`/mcp`, read-only tools), outbound A2A/MCP clients on the
   pinned SSRF transport, seeded demo agent. 307 local tests pass. Nothing live observed yet.
+- 2026-09-19 — Gate 4 local: RSA keys from the OS CSPRNG (0600 files), identity CSR (`ans://` URI SAN) + server CSR,
+  GoDaddy ANS REST client (Bearer PAT and `sso-key`, allow-listed API origin, no redirect following), registration
+  state machine (PENDING_VALIDATION → PENDING_DNS → ACTIVE; status only ever copied from a live API response).
+  All tested against an in-memory fake of the documented API — NOT against GoDaddy. Live status unchanged.
+- 2026-09-19 — Gate 5 local: 15-point verifier (live ANS lookup + detail + transparency-log badge, host/endpoint binding,
+  outbound network policy, TLS probe, identity-certificate binding/chain, A2A card + MCP handshake, card-hash drift,
+  blocklist) and redacted proof/evidence bundles. Trust-anchor chain check reports INCOMPLETE until an official ANS
+  root is provisioned via `ANS_TRUST_ANCHOR_PATH` (none is published; see docs/research/ANS_API_NOTES.md §8).

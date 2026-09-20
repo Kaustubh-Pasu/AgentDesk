@@ -17,6 +17,10 @@ class FakeANS:
         self.singular_challenge = singular_challenge
         self.fail_next: list[httpx.Response] = []
         self.acme_ok = True
+        self.badge_down = False
+        self.badge_overrides: dict[str, Any] = {}
+        self.identity_fingerprints: dict[str, str] = {}
+        self.detail_overrides: dict[str, Any] = {}
         self.dns_ok = True
 
     @property
@@ -51,6 +55,16 @@ class FakeANS:
             return self.fail_next.pop(0)
         path, method = request.url.path, request.method
         body = json.loads(request.content) if request.content else {}
+        if request.url.host.startswith("transparency."):
+            assert "authorization" not in request.headers, "credential must never be sent to the transparency log"
+            agent = self.agents.get(path.rsplit("/", 1)[-1])
+            if agent is None or self.badge_down:
+                return self._err(404 if agent is None else 503, "NOT_FOUND")
+            badge = {"status": agent["agentStatus"], "schemaVersion": "V1", "payload": {"producer": {"event": {
+                "ansName": agent["ansName"], "agent": {"host": agent["agentHost"], "version": f"v{agent['version']}"},
+                "attestations": {"identityCert": {"fingerprint": self.identity_fingerprints.get(agent["agentId"], "")}}}}}}
+            badge.update(self.badge_overrides)
+            return httpx.Response(200, json=badge)
         if path.startswith("/v1/ans/"):
             if path == "/v1/ans/search-registered-agents":
                 statuses = set(body.get("statuses") or ["ACTIVE"])
@@ -59,7 +73,9 @@ class FakeANS:
                          and (not domains or a["agentHost"] in domains)]
                 return httpx.Response(200, json={"items": items[: body.get("pageSize", 20)], "links": []})
             agent = self.agents.get(path.rsplit("/", 1)[-1])
-            return httpx.Response(200, json=self._hit(agent)) if agent else self._err(404, "NOT_FOUND")
+            if agent is None:
+                return self._err(404, "NOT_FOUND")
+            return httpx.Response(200, json={**self._hit(agent), **self.detail_overrides})
         auth = request.headers.get("authorization", "")
         if not auth:
             return httpx.Response(302, headers={"location": "https://sso.godaddy.com/login"})

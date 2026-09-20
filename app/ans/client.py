@@ -181,6 +181,32 @@ class DiscoveredAgent(_Model):
         return self.lifecycle.status
 
 
+class Badge(_Model):
+    """Transparency-Log badge, flattened to the fields the verifier compares."""
+
+    status: str = Field("", max_length=40)
+    ans_name: str = Field("", max_length=300)
+    agent_host: str = Field("", max_length=253)
+    identity_fingerprint: str = Field("", max_length=100)
+    server_fingerprint: str = Field("", max_length=100)
+
+    @classmethod
+    def from_wire(cls, data: dict[str, Any]) -> Badge:
+        def dig(node: Any, *keys: str) -> Any:
+            for key in keys:
+                node = node.get(key) if isinstance(node, dict) else None
+            return node
+
+        event = dig(data, "payload", "producer", "event") or {}
+        return cls(
+            status=str(data.get("status") or ""),
+            ans_name=str(dig(event, "ansName") or ""),
+            agent_host=str(dig(event, "agent", "host") or ""),
+            identity_fingerprint=str(dig(event, "attestations", "identityCert", "fingerprint") or ""),
+            server_fingerprint=str(dig(event, "attestations", "serverCert", "fingerprint") or ""),
+        )
+
+
 def parse_timestamp(value: str | None) -> datetime | None:
     """Lenient RFC 3339 (space separator, ``Z``, nanoseconds) → aware datetime, or None."""
     if not value:
@@ -241,12 +267,14 @@ class AnsClient:
         return AnsApiError(response.status_code, code, message, details)
 
     async def _call(self, method: str, path: str, *, auth: bool, params: dict[str, Any] | None = None,
-                    body: dict[str, Any] | None = None, retry: bool = False) -> Any:
+                    body: dict[str, Any] | None = None, retry: bool = False, base: str | None = None) -> Any:
         headers = {"Accept": "application/json", "Content-Type": "application/json",
                    "X-Request-Id": str(uuid.uuid4())}
         if auth:
             headers["Authorization"] = self._auth_header()
-        url = f"{self._settings.godaddy_api_base}{path}"
+        if base is not None and auth:
+            raise AnsApiError(0, "CREDENTIAL_SCOPE")  # the credential only ever goes to the RA API origin
+        url = f"{base or self._settings.godaddy_api_base}{path}"
         attempts = 1 + (self._max_retries if retry else 0)
         async with httpx.AsyncClient(timeout=self._settings.ans_request_timeout_s, follow_redirects=False,
                                      trust_env=False, transport=self._transport) as client:
@@ -359,3 +387,11 @@ class AnsClient:
     async def get_registered_agent(self, agent_id: str) -> DiscoveredAgent:
         data = await self._call("GET", f"/v1/ans/registered-agents/{self._id(agent_id)}", auth=False, retry=True)
         return self._parse(DiscoveredAgent, data)
+
+    async def get_badge(self, agent_id: str) -> Badge:
+        """Public Transparency-Log badge (the ANS revocation channel). No credential; fixed official origin."""
+        data = await self._call("GET", f"/v1/agents/{self._id(agent_id)}", auth=False, retry=True,
+                                base=self._settings.transparency_log_base)
+        if not isinstance(data, dict):
+            raise AnsApiError(200, "UNEXPECTED_RESPONSE_SHAPE")
+        return self._parse(Badge, Badge.from_wire(data).model_dump())
