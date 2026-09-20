@@ -160,7 +160,7 @@ async def test_http01_challenge_files_are_written_but_not_snapshotted(tmp_path, 
     assert publish_http01_challenges(pending, tmp_path) == 1  # overwrite ok
 
 
-async def test_register_recovers_agent_id_from_allowlisted_links(ans_settings) -> None:
+async def test_register_recovers_agent_id_from_allowlisted_links(db: Database, fake_ans: FakeANS, ans_settings) -> None:  # type: ignore[no-untyped-def]
     from app.ans.client import RegistrationPending
 
     pending = RegistrationPending.model_validate(
