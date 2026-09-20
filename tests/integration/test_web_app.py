@@ -76,7 +76,7 @@ async def test_health_home_and_security_headers(web: Web) -> None:
     )
     assert (
         h["x-frame-options"] == "DENY"
-        and h["referrer-policy"] == "no-referrer"
+        and h["referrer-policy"] == "same-origin"
         and h["cross-origin-opener-policy"] == "same-origin"
     )
     assert "camera=()" in h["permissions-policy"] and "server" not in h and "x-request-id" in h

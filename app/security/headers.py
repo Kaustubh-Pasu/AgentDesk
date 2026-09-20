@@ -18,7 +18,9 @@ HSTS = "max-age=63072000; includeSubDomains"
 BASE_HEADERS: dict[str, str] = {
     "Content-Security-Policy": CSP,
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    # same-origin, not no-referrer: under no-referrer browsers send "Origin: null" on form POSTs,
+    # which the CSRF origin check (correctly) refuses. same-origin still sends nothing cross-site.
+    "Referrer-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
