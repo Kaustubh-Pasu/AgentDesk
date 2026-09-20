@@ -25,8 +25,10 @@ _Last updated: 2026-09-19 — all mockable/testable work is complete; every live
    `ANS_AUTH_SCHEME=sso-key` with `GODADDY_API_KEY` / `GODADDY_API_SECRET`.
 4. Ability to create DNS records for the agent hosts: one `_acme-challenge` TXT, then `_ans` / `_ans-badge` TXT (and TLSA/HTTPS
    if your DNS host supports them) (Gate 4).
-5. Optional: an official ANS CA bundle for `ANS_TRUST_ANCHOR_PATH`. None is published today; without it the identity-chain
-   check stays `INCOMPLETE` (by design) while every other check works.
+5. The ANS trust anchor for `ANS_TRUST_ANCHOR_PATH`. GoDaddy publishes no bundle, so provision it once from the
+   `chainPEM` of an agent you own: `uv run python deploy/ans_trust_anchor.py --host desk.$BASE_DOMAIN`. It prints the
+   root and its SHA-256; set `ANS_TRUST_ANCHOR_PATH` + `ANS_TRUST_ANCHOR_SHA256` from that output. Skip it and the
+   identity-chain check stays `INCOMPLETE` (by design) while every other check works.
 
 ## Exact next commands (in order)
 

@@ -37,7 +37,7 @@ def load_porkbun_secrets(repo_root: Path) -> tuple[str, str]:
 
 def _call(path: str, key: str, secret: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     body = {"apikey": key, "secretapikey": secret, **(extra or {})}
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310 - fixed https:// origin, never a caller-supplied scheme
         f"{PORKBUN}{path}",
         data=json.dumps(body).encode(),
         method="POST",

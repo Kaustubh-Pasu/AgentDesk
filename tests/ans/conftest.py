@@ -70,8 +70,11 @@ class FakePKI:
         uri: str | None = None,
         days: int = 90,
         start_days_ago: int = 1,
+        key=None,  # type: ignore[no-untyped-def]
     ) -> x509.Certificate:
-        key = ec.generate_private_key(ec.SECP256R1())
+        # ``key`` lets a test certify a key it also holds (ANS issues RSA identity keys, and card signatures
+        # are made with exactly the key the registry certified).
+        key = key or ec.generate_private_key(ec.SECP256R1())
         now = datetime.now(UTC)
         sans: list[x509.GeneralName] = [x509.DNSName(host)]
         if uri != "":

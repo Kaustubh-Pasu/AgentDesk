@@ -100,9 +100,20 @@ client uses a different HTTP stack that cannot take our transport, and size/time
 `identity_chain_trust_anchor` · `metadata_fetch` · `metadata_schema` · `metadata_integrity` · `card_hash_drift` · `local_blocklist`.
 
 Each is `PASS` / `FAIL` / `INCOMPLETE`. Any FAIL ⇒ decision FAIL. A mandatory INCOMPLETE ⇒ decision INCOMPLETE.
-The identity-certificate checks are optional-but-blocking-on-FAIL, because **GoDaddy publishes no ANS root CA** today
-(`docs/research/ANS_API_NOTES.md` §8) and the certificate API only serves your own agents: until you provision
-`ANS_TRUST_ANCHOR_PATH`, `identity_chain_trust_anchor` reports **INCOMPLETE** — never PASS.
+The identity-certificate checks are optional-but-blocking-on-FAIL. **GoDaddy publishes no ANS root CA bundle**
+(`docs/research/ANS_API_NOTES.md` §8), so the anchor is provisioned once by an operator from the only non-agent
+source there is — the `chainPEM` of an agent you own, fetched from the authenticated certificate API:
+
+```bash
+uv run python deploy/ans_trust_anchor.py --host desk.example.com     # prints the anchor + its SHA-256 pin
+```
+
+Set `ANS_TRUST_ANCHOR_PATH` and `ANS_TRUST_ANCHOR_SHA256` from its output. Until you do,
+`identity_chain_trust_anchor` reports **INCOMPLETE** — never PASS. A root that merely arrives in a remote
+agent's chain is still ignored, and if the bundle is ever swapped the pin sends the check back to INCOMPLETE.
+
+The certificate API only serves agents your credential owns, so checks 8–10 stay INCOMPLETE for third-party
+agents. That is the honest answer, not a defect.
 
 ## Local development
 
@@ -236,11 +247,15 @@ docs/           spec, build prompt, research notes (ANS API contract incl. live 
 
 ## Known limitations
 
-- Identity-certificate chain verification is INCOMPLETE until an official ANS trust anchor is provisioned (none is published).
-  Transparency-log badges are fetched over TLS from the official host and compared, but their signatures/Merkle proofs are
-  not verified offline yet.
-- A2A Agent Card signatures are recorded, not verified: the key is published by the agent itself (`jku` on its own host), so it
-  adds no trust beyond TLS; ANS `metaDataHash` is verified when present.
+- Identity-certificate chain verification is INCOMPLETE until an operator provisions the anchor
+  (`deploy/ans_trust_anchor.py`); no bundle is published by GoDaddy. Transparency-log badges are fetched over TLS from
+  the official host and compared, but their signatures/Merkle proofs are not verified offline yet.
+- Agent Card integrity: ANS `metaDataHash` is verified when present, but the registry does not populate it today
+  (confirmed live on the detail, search and transparency-log APIs). A card signed with a key the agent publishes for
+  itself is recorded and reported INCOMPLETE — it adds no trust beyond TLS. A card signed with the key in the
+  **ANS-issued identity certificate** is verified and PASSes, because that key is bound to `ans://v{version}.{host}`
+  by the registry's own CA. Agent Desk signs its own cards that way (`app/ans/card_signature.py`); third-party agents
+  that do not remain INCOMPLETE.
 - The deterministic (no-LLM) extractor is conservative: it fills name, description, contact, address and hours; menus/services
   usually need the owner to type them or an LLM provider to be configured.
 - A2A tasks are in-memory and complete immediately; streaming and push notifications are intentionally disabled.

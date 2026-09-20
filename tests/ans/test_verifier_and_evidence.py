@@ -71,12 +71,12 @@ class World:
 
 
 @asynccontextmanager
-async def world(db: Database, tmp_path) -> AsyncIterator[World]:  # type: ignore[no-untyped-def]
+async def world(db: Database, tmp_path, signer=None) -> AsyncIterator[World]:  # type: ignore[no-untyped-def]
     settings = make_settings(base_domain=BASE, godaddy_pat=PAT, artifacts_dir=str(tmp_path / "artifacts"))
     await seed_demo_agent(db, settings)
     runtime = AgentRuntime(AgentRegistry(db, settings), settings)
     mcp = McpProtocolServer(runtime, settings)
-    app = Starlette(routes=[*create_a2a_routes(runtime, settings), *mcp.routes()])
+    app = Starlette(routes=[*create_a2a_routes(runtime, settings, signer), *mcp.routes()])
     ready, stop = asyncio.Event(), asyncio.Event()
 
     async def hold() -> None:
@@ -366,3 +366,112 @@ def test_bundle_name_is_not_a_path(tmp_path) -> None:  # type: ignore[no-untyped
     for name in ("../evil", "a/b", "", "X" * 200, ".hidden"):
         with pytest.raises(ValueError):
             write_evidence_bundle({}, tmp_path, name=name)
+
+
+async def test_every_check_passes_when_the_registry_side_evidence_exists(  # type: ignore[no-untyped-def]
+    db: Database, tmp_path, pki: FakePKI
+) -> None:
+    """All 15 checks PASS — and each one only because real evidence was produced, not because it was assumed.
+
+    This is the shape a deployment reaches once (a) an ANS credential can reach the authenticated certificate
+    API, (b) an official trust anchor has been provisioned and pinned, and (c) the agent signs its card with
+    the identity key ANS certified. Remove any one of those and the corresponding check drops back to
+    INCOMPLETE, which the neighbouring tests assert.
+    """
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    from app.ans.card_signature import CardSigner, sign_card
+
+    identity_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    leaf = pki.identity_cert(DEMO, key=identity_key)
+    bundle = tmp_path / "anchor.pem"
+    bundle.write_text(pem(pki.root))
+    anchors = TrustAnchors.load(str(bundle), {fingerprint_sha256(pki.root)})
+
+    class KeySigner(CardSigner):
+        """Stands in for LocalCardSigner: signs with exactly the key the (fake) registry certified."""
+
+        async def sign(self, agent_host: str, version: str, card):  # type: ignore[no-untyped-def]
+            return sign_card(identity_key, leaf, f"ans://v{version}.{agent_host}", card)
+
+    async with world(db, tmp_path, signer=KeySigner()) as w:
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate) + pem(pki.root), "csrId": "x"}
+            ]
+        }
+        w.ans.identity_fingerprints[w.agent_id] = "SHA256:" + fingerprint_sha256(leaf)
+        result = await w.verifier(anchors=anchors).verify(DEMO, probe_tool="get_hours")
+
+    checks = by_id(result)
+    assert len(checks) == 15
+    incomplete = sorted(c.id for c in result.checks if c.status == "INCOMPLETE")
+    assert incomplete == [], f"still not proven: {incomplete}"
+    assert all(c.status == "PASS" for c in result.checks)
+    assert result.verified and result.decision == "PASS" and not result.reasons
+    assert result.a2a.signed and result.identity_certificate is not None
+
+
+async def test_card_signed_by_an_uncertified_key_is_incomplete_not_pass(  # type: ignore[no-untyped-def]
+    db: Database, tmp_path, pki: FakePKI
+) -> None:
+    """A key the agent publishes for itself proves nothing — and is not treated as a failure either."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    from app.ans.card_signature import CardSigner, sign_card
+
+    certified_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    leaf = pki.identity_cert(DEMO, key=certified_key)
+    rogue_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rogue_cert = pki.identity_cert(DEMO, key=rogue_key)
+    bundle = tmp_path / "anchor.pem"
+    bundle.write_text(pem(pki.root))
+    anchors = TrustAnchors.load(str(bundle), set())
+
+    class SelfPublishedSigner(CardSigner):
+        async def sign(self, agent_host: str, version: str, card):  # type: ignore[no-untyped-def]
+            return sign_card(rogue_key, rogue_cert, f"ans://v{version}.{agent_host}", card)
+
+    async with world(db, tmp_path, signer=SelfPublishedSigner()) as w:
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate) + pem(pki.root), "csrId": "x"}
+            ]
+        }
+        result = await w.verifier(anchors=anchors).verify(DEMO)
+
+    checks = by_id(result)
+    assert checks["metadata_integrity"] == "INCOMPLETE"
+    assert checks["identity_certificate_retrieved"] == "PASS"
+    assert result.decision == "PASS"  # an optional INCOMPLETE does not block, but it IS reported
+    assert any("metadata" in r.lower() or "signed" in r.lower() for r in result.reasons)
+
+
+async def test_tampered_card_from_a_certified_signer_fails(db: Database, tmp_path, pki: FakePKI) -> None:  # type: ignore[no-untyped-def]
+    """A signature that claims the ANS identity but does not cover the served bytes is a hard FAIL."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    from app.ans.card_signature import CardSigner, sign_card
+
+    identity_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    leaf = pki.identity_cert(DEMO, key=identity_key)
+    bundle = tmp_path / "anchor.pem"
+    bundle.write_text(pem(pki.root))
+    anchors = TrustAnchors.load(str(bundle), set())
+
+    class StaleSigner(CardSigner):
+        """Signs a DIFFERENT card than the one served — what an in-flight edit would look like."""
+
+        async def sign(self, agent_host: str, version: str, card):  # type: ignore[no-untyped-def]
+            return sign_card(identity_key, leaf, f"ans://v{version}.{agent_host}", {**card, "name": "Other"})
+
+    async with world(db, tmp_path, signer=StaleSigner()) as w:
+        w.ans.certs[w.agent_id] = {
+            "identity": [
+                {"certificatePEM": pem(leaf), "chainPEM": pem(pki.intermediate) + pem(pki.root), "csrId": "x"}
+            ]
+        }
+        result = await w.verifier(anchors=anchors).verify(DEMO)
+
+    assert by_id(result)["metadata_integrity"] == "FAIL"
+    assert result.decision == "FAIL" and not result.verified

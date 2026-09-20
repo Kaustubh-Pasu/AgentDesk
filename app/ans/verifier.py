@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 from cryptography import x509
 from sqlalchemy import select
 
+from app.ans.card_signature import MISMATCH, VERIFIED, verify_card_signature
 from app.ans.certs import (
     CertError,
     TrustAnchors,
@@ -34,7 +35,15 @@ from app.ans.certs import (
     summarize,
     verify_chain,
 )
-from app.ans.client import CONNECTABLE_STATUSES, AnsApiError, AnsClient, AnsEndpoint, Badge, DiscoveredAgent
+from app.ans.client import (
+    CONNECTABLE_STATUSES,
+    AnsApiError,
+    AnsClient,
+    AnsEndpoint,
+    Badge,
+    CertificateSource,
+    DiscoveredAgent,
+)
 from app.logging_config import get_logger
 from app.models.db import BlockedAgent, CardObservation, Database, utcnow
 from app.models.schemas import (
@@ -129,6 +138,7 @@ class Verifier:
         http: RemoteHttp,
         db: Database | None,
         *,
+        certificates: CertificateSource | None = None,
         anchors: TrustAnchors | None = None,
         address_policy: AddressPolicy | None = None,
         resolver: Resolver = system_resolver,
@@ -136,6 +146,9 @@ class Verifier:
     ) -> None:
         self._settings = settings
         self._ans = ans
+        # Checks 8-10 need the AUTHENTICATED certificate API. On the public desk the credential for it lives in
+        # the control plane, so the source is a client for that service; in role ``all`` it is the ANS client.
+        self._certificates: CertificateSource = certificates or ans
         self._db = db
         self._a2a = A2AClient(http)
         self._mcp = McpClient(http)
@@ -275,11 +288,11 @@ class Verifier:
         badge = await self._consistency(live, candidate, add)
 
         # 8-10. identity certificate (official API only)
-        await self._identity(live, badge, result, add)
+        identity_leaf = await self._identity(live, badge, result, add)
 
         # 11-14. protocol metadata — only contacted if the destination checks passed
         safe = https_ok and bound and net_status == "PASS"
-        card = await self._metadata(host, endpoints, safe, probe_tool, result, add)
+        card = await self._metadata(host, endpoints, safe, probe_tool, identity_leaf, result, add)
         await self._drift(host, live.ans_name, card, result, add)
 
         # 15. local blocklist
@@ -375,18 +388,20 @@ class Verifier:
         badge: Badge | None,
         result: VerificationResult,
         add: Callable[..., Status],
-    ) -> None:
+    ) -> x509.Certificate | None:
+        """Checks 8-10. Returns the leaf ONLY when binding and chain both PASS, so a caller that builds on it
+        (check 13) can never rest on a certificate this function did not fully verify."""
         label8, label9, label10 = (
             "Identity certificate retrieved from ANS",
             "Identity certificate validity and binding",
             "Identity certificate chains to the ANS trust anchor",
         )
         leaf, chain, why = None, [], ""
-        if not self._ans.configured:
+        if not self._certificates.configured:
             why = "no ANS credential configured: the certificate API is authenticated"
         else:
             try:
-                certs = await self._ans.get_identity_certificates(live.agent_id)
+                certs = await self._certificates.get_identity_certificates(live.agent_id)
                 if certs:
                     newest = certs[-1]
                     leaf = load_certificates(newest.certificate_pem, limit=1)[0]
@@ -409,7 +424,7 @@ class Verifier:
                 )
                 add("identity_certificate_binding", label9, "FAIL", "no usable certificate", mandatory=False)
                 add("identity_chain_trust_anchor", label10, "FAIL", "no usable certificate", mandatory=False)
-                return
+                return None
         if leaf is None:
             for id_, label in (
                 ("identity_certificate_retrieved", label8),
@@ -417,7 +432,7 @@ class Verifier:
                 ("identity_chain_trust_anchor", label10),
             ):
                 add(id_, label, "INCOMPLETE", why, mandatory=False)
-            return
+            return None
         summary = summarize(leaf)
         add(
             "identity_certificate_retrieved",
@@ -443,6 +458,7 @@ class Verifier:
         result.identity_certificate = summary
         add("identity_certificate_binding", label9, bind_status, bind_reason, mandatory=False)
         add("identity_chain_trust_anchor", label10, chain_status, chain_reason, mandatory=False)
+        return leaf if bind_status == "PASS" and chain_status == "PASS" else None
 
     async def _metadata(
         self,
@@ -450,6 +466,7 @@ class Verifier:
         endpoints: list[AnsEndpoint],
         safe: bool,
         probe_tool: str | None,
+        identity_leaf: x509.Certificate | None,
         result: VerificationResult,
         add: Callable[..., Status],
     ) -> FetchedCard | None:
@@ -559,12 +576,31 @@ class Verifier:
                 else "card hash differs from the ANS metaDataHash",
                 mandatory=False,
             )
+        elif card is not None and card.signed and identity_leaf is not None:
+            # The ONLY card signature worth anything: one made with the key in the identity certificate that
+            # ANS issued, which this run already retrieved from the authenticated API and chained to the
+            # provisioned trust anchor. A key the card itself publishes proves nothing and is never consulted.
+            outcome, reason = verify_card_signature(
+                list(card.document.get("signatures", [])), card.document, identity_leaf
+            )
+            integrity: Status = (
+                "PASS" if outcome == VERIFIED else "FAIL" if outcome == MISMATCH else "INCOMPLETE"
+            )
+            add(
+                "metadata_integrity",
+                labels[2],
+                integrity,
+                reason,
+                mandatory=False,
+                identity_sha256=fingerprint_sha256(identity_leaf) if outcome == VERIFIED else None,
+            )
         elif card is not None and card.signed:
             add(
                 "metadata_integrity",
                 labels[2],
                 "INCOMPLETE",
-                "card carries a signature; its key is published by the agent itself, so it is recorded but not used as a trust input",
+                "card carries a signature, but no verified ANS identity certificate is available to check it "
+                "against; a key the agent publishes for itself is not a trust input",
                 mandatory=False,
             )
         else:
@@ -652,7 +688,8 @@ class Verifier:
             ),
             AnsEndpoint.model_validate({"agentUrl": f"https://{host}/mcp", "protocol": "MCP"}),
         ]
-        await self._metadata(host, synthetic, result.tls.status == "PASS", None, result, add)
+        # No registry record here, so there is no ANS identity certificate to anchor a card signature to.
+        await self._metadata(host, synthetic, result.tls.status == "PASS", None, None, result, add)
 
     @staticmethod
     def _finish(result: VerificationResult, checks: list[CheckResult]) -> VerificationResult:

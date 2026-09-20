@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -72,6 +72,9 @@ class FetchedCard:
     rpc_protocol_version: str
     protocol_versions: tuple[str, ...]
     signed: bool
+    #: The card exactly as served, kept so a signature can be checked against the bytes it covers. Data only:
+    #: nothing here is ever executed, and no key or certificate inside it is used as a trust input.
+    document: dict[str, Any] = field(default_factory=dict)
 
 
 def _pick_jsonrpc(card: _Card) -> tuple[str, str]:
@@ -105,6 +108,7 @@ def parse_agent_card(data: dict[str, Any], raw: bytes, card_url: str) -> Fetched
         rpc_protocol_version=rpc_version,
         protocol_versions=tuple(sorted(versions)),
         signed=bool(card.signatures),
+        document=data,
     )
 
 

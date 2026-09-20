@@ -30,6 +30,7 @@ from starlette.routing import BaseRoute, Route
 
 from app.agents.registry import ServedAgent
 from app.agents.runtime import AgentRuntime, SkillError, skills_for
+from app.ans.card_signature import SIGNATURE_FIELD, CardSigner
 from app.logging_config import get_logger
 from app.models.schemas import canonical_json
 from app.security.middleware import client_ip
@@ -80,6 +81,24 @@ def agent_card_json(agent: ServedAgent, settings: Settings) -> dict[str, Any]:
     return agent_card_to_dict(build_agent_card(agent, settings))
 
 
+async def signed_agent_card_json(
+    agent: ServedAgent, settings: Settings, signer: CardSigner | None
+) -> dict[str, Any]:
+    """The public card, with a detached JWS attached when the ANS identity key can sign it.
+
+    The signature is made by the key in this agent's ANS identity certificate, so a caller can bind the card
+    to the registry identity instead of to a key we publish about ourselves. If signing is unavailable the
+    card is served unsigned: an unsigned card verifies as INCOMPLETE, a wrong signature would verify as FAIL.
+    """
+    card = agent_card_json(agent, settings)
+    if signer is None:
+        return card
+    signature = await signer.sign(agent.host, agent.version, card)
+    if signature:
+        card[SIGNATURE_FIELD] = [signature]
+    return card
+
+
 def card_sha256(card: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json(card).encode()).hexdigest()
 
@@ -125,7 +144,9 @@ class RuntimeExecutor(AgentExecutor):
         raise UnsupportedOperationError(message="Tasks complete immediately and cannot be cancelled.")
 
 
-def create_a2a_routes(runtime: AgentRuntime, settings: Settings) -> list[BaseRoute]:
+def create_a2a_routes(
+    runtime: AgentRuntime, settings: Settings, signer: CardSigner | None = None
+) -> list[BaseRoute]:
     async def agent_card(request: Request) -> Response:
         agent = await runtime.registry.resolve(request.headers.get("host", ""))
         if agent is None:
@@ -133,7 +154,7 @@ def create_a2a_routes(runtime: AgentRuntime, settings: Settings) -> list[BaseRou
                 {"error": {"code": "agent_not_found", "message": "No agent on this host."}}, 404
             )
         return JSONResponse(
-            agent_card_json(agent, settings),
+            await signed_agent_card_json(agent, settings, signer),
             headers={"Cache-Control": "public, max-age=60", "X-Content-Type-Options": "nosniff"},
         )
 

@@ -61,7 +61,11 @@ services:
       CONTROLPLANE_URL: http://controlplane:8000
       TRUSTED_PROXY_CIDRS: 172.30.0.0/24
       GODADDY_API_BASE: ${GODADDY_API_BASE:-https://api.godaddy.com}
+      # Operator-provisioned ANS root bundle + its pin (deploy/ans_trust_anchor.py writes both into the
+      # already-mounted artifacts volume — public CA material, no new mount). Empty → the identity-chain
+      # check stays INCOMPLETE, which is the honest answer when no anchor has been provisioned.
       ANS_TRUST_ANCHOR_PATH: ${ANS_TRUST_ANCHOR_PATH:-}
+      ANS_TRUST_ANCHOR_SHA256: ${ANS_TRUST_ANCHOR_SHA256:-}
       ARTIFACTS_DIR: /artifacts
     volumes:
       - ../artifacts:/artifacts
@@ -84,6 +88,8 @@ services:
       SERVICE_ROLE: controlplane
       BASE_DOMAIN: ${BASE_DOMAIN}
       GODADDY_API_BASE: ${GODADDY_API_BASE:-https://api.godaddy.com}
+      ANS_TRUST_ANCHOR_PATH: ${ANS_TRUST_ANCHOR_PATH:-}
+      ANS_TRUST_ANCHOR_SHA256: ${ANS_TRUST_ANCHOR_SHA256:-}
       KEYS_DIR: /keys
       ARTIFACTS_DIR: /artifacts
     volumes:

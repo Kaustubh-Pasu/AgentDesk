@@ -17,7 +17,7 @@ import random
 import re
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -159,7 +159,11 @@ class AgentDetails(_Model):
     @classmethod
     def _copy_list_status(cls, data: Any) -> Any:
         # GET /v1/agents list items use "status"; GET /v1/agents/{id} uses "agentStatus".
-        if isinstance(data, dict) and not data.get("agentStatus") and isinstance(data.get("status"), (str, dict)):
+        if (
+            isinstance(data, dict)
+            and not data.get("agentStatus")
+            and isinstance(data.get("status"), (str, dict))
+        ):
             return {**data, "agentStatus": data["status"]}
         return data
 
@@ -186,6 +190,19 @@ class CertificateResponse(_Model):
     chain_pem: str | None = Field(None, alias="chainPEM", max_length=65_536)
     certificate_valid_from: str | None = Field(None, alias="certificateValidFrom", max_length=64)
     certificate_valid_to: str | None = Field(None, alias="certificateValidTo", max_length=64)
+
+
+class CertificateSource(Protocol):
+    """Where the verifier gets identity certificates (checks 8-10).
+
+    ``AnsClient`` implements it directly when this process holds the credential; the public desk gets an
+    implementation that asks the control plane instead, so the credential never reaches the web role.
+    """
+
+    @property
+    def configured(self) -> bool: ...
+
+    async def get_identity_certificates(self, agent_id: str) -> list[CertificateResponse]: ...
 
 
 class RevocationResponse(_Model):

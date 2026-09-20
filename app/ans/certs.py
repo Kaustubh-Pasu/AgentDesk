@@ -109,6 +109,20 @@ class KeyStore:
         major, minor, patch = parse_semver(version)
         return self._root / host / f"v{major}.{minor}.{patch}"
 
+    def load(self, agent_host: str, version: str, kind: KeyKind) -> rsa.RSAPrivateKey | None:
+        """Existing key only — never generates. Signing must use the key the registry already certified."""
+        if kind not in ("identity", "server"):
+            raise CertError("key_kind_invalid")
+        path = self._dir(agent_host, version) / f"{kind}.key.pem"
+        if not path.exists():
+            return None
+        if path.stat().st_mode & 0o077:
+            raise CertError("key_permissions", "private key file must not be group/world accessible")
+        key = serialization.load_pem_private_key(path.read_bytes(), password=None)
+        if not isinstance(key, rsa.RSAPrivateKey):
+            raise CertError("key_type_invalid")
+        return key
+
     def load_or_create(self, agent_host: str, version: str, kind: KeyKind) -> rsa.RSAPrivateKey:
         if kind not in ("identity", "server"):
             raise CertError("key_kind_invalid")

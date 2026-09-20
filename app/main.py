@@ -34,7 +34,18 @@ from app.ans.evidence import ProofService
 from app.ans.http01 import read_http01_challenge
 from app.ans.registration import RegistrationFlow, RegistrationService
 from app.ans.verifier import TlsProbe, Verifier
-from app.controlplane.api import LocalRegistrar, Registrar, RemoteRegistrar, controlplane_routes
+from app.controlplane.api import (
+    CardSigner,
+    CertificateSource,
+    LocalCardSigner,
+    LocalRegistrar,
+    NullCardSigner,
+    Registrar,
+    RemoteCardSigner,
+    RemoteCertificates,
+    RemoteRegistrar,
+    controlplane_routes,
+)
 from app.controlplane.tenants import TenantService
 from app.find.service import FindDeskBackend, FindService
 from app.ingestion.scraper_service import Crawler, build_crawler, scraper_routes
@@ -89,6 +100,8 @@ class Services:
     find: FindService
     tenants: TenantService
     registrar: Registrar
+    certificates: CertificateSource
+    card_signer: CardSigner
     mcp: McpProtocolServer
 
 
@@ -101,18 +114,33 @@ def build_services(settings: Settings, overrides: Overrides | None = None) -> Se
     registry = AgentRegistry(db, settings)
     ans = AnsClient(settings, transport=o.ans_transport)
     http = o.remote_http or RemoteHttp(settings)
+    registrar: Registrar
+    certificates: CertificateSource
+    card_signer: CardSigner
+    # The GoDaddy credential and the ANS private keys live in ONE process. Every other role asks that process
+    # for the finished result (a public certificate, a card signature) over the private control-plane link.
+    if settings.controlplane_url and settings.service_role != "controlplane":
+        registrar = RemoteRegistrar(settings)
+        certificates = RemoteCertificates(settings)
+        card_signer = RemoteCardSigner(settings)
+    else:
+        keystore = KeyStore(settings.keys_path, settings.base_domain)
+        flow = RegistrationFlow(ans, keystore, settings)
+        registrar = LocalRegistrar(RegistrationService(db, flow, registry, kv, settings))
+        certificates = ans
+        card_signer = LocalCardSigner(settings, ans, keystore) if ans.configured else NullCardSigner()
     verifier = Verifier(
-        settings, ans, http, db, resolver=o.resolver or system_resolver, tls_probe=o.tls_probe
+        settings,
+        ans,
+        http,
+        db,
+        certificates=certificates,
+        resolver=o.resolver or system_resolver,
+        tls_probe=o.tls_probe,
     )
     find = FindService(settings, ans, verifier, http, limiter, db)
     runtime = AgentRuntime(registry, settings, llm=llm, desk_backend=FindDeskBackend(find))
     tenants = TenantService(db, settings, registry, limiter, o.crawler or build_crawler(settings), llm)
-    registrar: Registrar
-    if settings.controlplane_url and settings.service_role != "controlplane":
-        registrar = RemoteRegistrar(settings)
-    else:
-        flow = RegistrationFlow(ans, KeyStore(settings.keys_path, settings.base_domain), settings)
-        registrar = LocalRegistrar(RegistrationService(db, flow, registry, kv, settings))
     return Services(
         settings,
         db,
@@ -126,6 +154,8 @@ def build_services(settings: Settings, overrides: Overrides | None = None) -> Se
         find,
         tenants,
         registrar,
+        certificates,
+        card_signer,
         McpProtocolServer(runtime, settings),
     )
 
@@ -250,7 +280,12 @@ def build_app(
     if settings.service_role == "controlplane":
         assert isinstance(services.registrar, LocalRegistrar)
         inner = Starlette(
-            routes=[Route("/healthz", _healthz), *controlplane_routes(settings, services.registrar)],
+            routes=[
+                Route("/healthz", _healthz),
+                *controlplane_routes(
+                    settings, services.registrar, services.certificates, services.card_signer
+                ),
+            ],
             lifespan=lifespan,
         )
         return _wrap(inner, settings, None, browser=False), services
@@ -281,7 +316,7 @@ def build_app(
             Route("/healthz", _healthz),
             Route("/internal/tls-ask", tls_ask),
             Route("/.well-known/acme-challenge/{token}", acme_http01, methods=["GET"]),
-            *create_a2a_routes(services.runtime, settings),
+            *create_a2a_routes(services.runtime, settings, services.card_signer),
             *services.mcp.routes(),
         ]
     )
