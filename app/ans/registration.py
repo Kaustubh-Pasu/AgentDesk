@@ -26,14 +26,7 @@ from sqlalchemy import select
 from app.agents.registry import AgentRegistry, ServedAgent
 from app.agents.runtime import ALL_SKILLS, skills_for
 from app.ans.certs import CsrBundle, KeyStore
-from app.ans.client import (
-    TERMINAL_STATUSES,
-    AgentDetails,
-    AnsApiError,
-    AnsClient,
-    DnsRecord,
-    RegistrationPending,
-)
+from app.ans.http01 import publish_http01_challenges
 from app.logging_config import get_logger
 from app.models.db import ANSRegistration, Database, Tenant, TenantState, utcnow
 from app.models.schemas import ans_name_for
@@ -147,6 +140,7 @@ class RegistrationSnapshot:
     dns_records: list[dict[str, Any]] = field(default_factory=list)
     rejected_records: list[dict[str, Any]] = field(default_factory=list)
     next_action: str = ""
+    http01_ready: bool = False
     checked_at: datetime = field(default_factory=utcnow)
 
     @property
@@ -206,6 +200,7 @@ class RegistrationFlow:
         acme = acme_challenge_records(pending, agent_host)
         good = [r for r in dns if allowed_dns_record(r, agent_host)]
         bad = [r for r in dns if not allowed_dns_record(r, agent_host)]
+        http01_ready = bool(pending and publish_http01_challenges(pending, self._settings.artifacts_path))
         return RegistrationSnapshot(
             agent_host=agent_host,
             version=version,
@@ -217,6 +212,7 @@ class RegistrationFlow:
             dns_records=[_record_dict(r) for r in good],
             rejected_records=[_record_dict(r) for r in bad],
             next_action=_next_action(status, acme, good),
+            http01_ready=http01_ready,
         )
 
     def _from_details(self, details: AgentDetails, agent_host: str, version: str) -> RegistrationSnapshot:

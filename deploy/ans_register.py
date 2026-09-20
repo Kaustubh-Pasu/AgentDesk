@@ -255,7 +255,12 @@ async def main_async(args: argparse.Namespace) -> int:
             return EXIT_OK
 
         if snapshot.status == "PENDING_VALIDATION":
-            if snapshot.acme_records and not args.verify:
+            if snapshot.http01_ready and not args.verify:
+                say(
+                    "\n[7] HTTP-01 challenge is being served at "
+                    f"https://{host}/.well-known/acme-challenge/… — calling verify-acme."
+                )
+            elif snapshot.acme_records and not args.verify:
                 print_records(
                     "[7] Publish this ACME DNS-01 TXT record exactly, wait until it resolves publicly, then re-run with --verify:",
                     snapshot.acme_records,

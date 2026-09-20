@@ -38,6 +38,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - ../artifacts/acme-http01:/acme-http01:ro
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
@@ -84,8 +85,10 @@ services:
       BASE_DOMAIN: ${BASE_DOMAIN}
       GODADDY_API_BASE: ${GODADDY_API_BASE:-https://api.godaddy.com}
       KEYS_DIR: /keys
+      ARTIFACTS_DIR: /artifacts
     volumes:
       - ans_keys:/keys                          # ANS private keys: mounted into THIS service only
+      - ../artifacts:/artifacts                 # redacted registration state/evidence (no secrets)
     mem_limit: 384m
     networks: [control, data, egress]
     depends_on:
