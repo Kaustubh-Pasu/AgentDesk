@@ -39,3 +39,6 @@ build/
 
 # --- design review screenshots (regenerable, large) ---
 .impeccable/review/
+
+# design review screenshots (regenerable)
+.impeccable/review-sc/
