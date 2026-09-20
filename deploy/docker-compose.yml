@@ -45,7 +45,6 @@ services:
     tmpfs: ["/tmp"]
     pids_limit: 256
     mem_limit: 256m
-    cpus: 1.0
     networks: [edge]
     depends_on:
       desk: { condition: service_healthy }
@@ -66,7 +65,6 @@ services:
     volumes:
       - ../artifacts:/artifacts
     mem_limit: 768m
-    cpus: 1.5
     networks: [edge, data, control, scrape]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/healthz', headers={'Host': 'desk.${BASE_DOMAIN}'}), timeout=3)"]
@@ -89,7 +87,6 @@ services:
     volumes:
       - ans_keys:/keys                          # ANS private keys: mounted into THIS service only
     mem_limit: 384m
-    cpus: 0.5
     networks: [control, data, egress]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -103,7 +100,6 @@ services:
       SESSION_SECRET: scraper-has-no-sessions-placeholder-0000000000
       CSRF_SECRET: scraper-has-no-csrf-placeholder-11111111111111
     mem_limit: 384m
-    cpus: 0.5
     networks: [scrape, scrape_egress]
 
   migrate:
