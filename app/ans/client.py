@@ -255,7 +255,7 @@ class AnsClient:
         try:
             body = json.loads(raw.decode("utf-8")) if raw else {}
             if isinstance(body, dict):
-                code = str(body.get("code") or code)
+                code = str(body.get("code") or body.get("name") or code)  # [LIVE] /v1/ans/* errors use "name"
                 message = str(body.get("message") or "")
                 if isinstance(body.get("details"), dict):
                     details = {str(k)[:40]: str(v)[:200] for k, v in list(body["details"].items())[:10]}

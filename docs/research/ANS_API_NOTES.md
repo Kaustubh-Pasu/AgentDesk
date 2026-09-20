@@ -614,3 +614,16 @@ The purpose-built CLI is `ans-cli` `[SDK]`: `brew install agentnameservice/ans/a
 5. Download certs (`GET .../certificates/identity|server`), store `certificatePEM` + `chainPEM`.
 6. Publish every returned DNS record (at least `required: true`); `POST .../verify-dns`; on 422 print `missingRecords` / `incorrectRecords[].expected|found`, fix, retry.
 7. Confirm `ACTIVE`; confirm public visibility via `GET /v1/ans/registered-agents/{agentId}` and TL badge `GET https://transparency.ans.godaddy.com/v1/agents/{agentId}`.
+
+---
+
+## 14. Live addendum from the build session (2026-09-19, read-only, unauthenticated)
+
+Observed while running `scripts/verify_public.py` against the public discovery API `[LIVE]`:
+
+- `POST /v1/ans/search-registered-agents` accepts only `ACTIVE` and `REVOKED` in `statuses[]`. `WARNING`, `DEPRECATED` and
+  `EXPIRED` are rejected with **422** `{"name":"INVALID_REQUEST","correlationId":...,"message":"status \"WARNING\" is not supported","details":[...]}`
+  even though §4.12 lists them. The client now sends `["ACTIVE"]` for FIND and `["ACTIVE","REVOKED"]` for verification lookups.
+- The `/v1/ans/*` error envelope uses **`name`** (not `code`) plus `correlationId`; the lenient parser reads both.
+- `agentDomains: ["<exact fqdn>"]` returns the exact host; `agentDomains: ["<apex>"]` returns its subdomains too, so results are
+  always re-filtered for an exact `agentHost` match.

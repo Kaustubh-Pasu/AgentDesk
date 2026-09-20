@@ -191,8 +191,9 @@ class Verifier:
     # ------------------------------------------------------------------ steps
     async def _lookup(self, host: str, version: str | None) -> tuple[DiscoveredAgent | None, str]:
         try:
-            hits = await self._ans.discover(agent_host=host, statuses=("ACTIVE", "WARNING", "DEPRECATED", "EXPIRED", "REVOKED"),
-                                            page_size=25)
+            # [LIVE 2026-09-19] the hosted discovery API accepts only ACTIVE and REVOKED as status filters
+            # (WARNING/DEPRECATED/EXPIRED → 422). Including REVOKED lets us say "revoked" instead of "not found".
+            hits = await self._ans.discover(agent_host=host, statuses=("ACTIVE", "REVOKED"), page_size=25)
         except AnsApiError as exc:
             return None, f"registry lookup failed ({exc.code})"
         hits = [h for h in hits if h.agent_host.lower() == host and (version is None or h.version == version)]

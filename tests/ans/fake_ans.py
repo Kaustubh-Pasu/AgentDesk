@@ -68,6 +68,9 @@ class FakeANS:
         if path.startswith("/v1/ans/"):
             if path == "/v1/ans/search-registered-agents":
                 statuses = set(body.get("statuses") or ["ACTIVE"])
+                unsupported = statuses - {"ACTIVE", "REVOKED"}  # observed live 2026-09-19
+                if unsupported:
+                    return httpx.Response(422, json={"name": "INVALID_REQUEST", "message": f'status "{sorted(unsupported)[0]}" is not supported'})
                 domains = body.get("agentDomains")
                 items = [self._hit(a) for a in self.agents.values() if a["agentStatus"] in statuses
                          and (not domains or a["agentHost"] in domains)]

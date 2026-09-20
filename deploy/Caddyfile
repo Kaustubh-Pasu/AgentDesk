@@ -1,0 +1,91 @@
+# Agent Desk — Caddy is the ONLY public ingress (80/443). Validate with:  caddy validate --config deploy/Caddyfile
+{
+	email {$ACME_EMAIL}
+	# Tenant hosts get certificates on demand, but ONLY if the app confirms the host is a served agent.
+	on_demand_tls {
+		ask http://desk:8000/internal/tls-ask
+	}
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 15s
+			idle 60s
+		}
+		max_header_size 16KB
+	}
+}
+
+(agentdesk) {
+	# Hard request-size cap at the edge (the app enforces the same limit again).
+	request_body {
+		max_size 256KB
+	}
+
+	# Internal endpoints never exist on the public side.
+	@internal path /internal /internal/*
+	respond @internal 404
+
+	header {
+		-Server
+		-Via
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Cross-Origin-Opener-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# The app sets the full CSP on every response; this is the fallback for proxy-generated errors.
+		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+	}
+
+	reverse_proxy desk:8000 {
+		# Client-supplied forwarding headers are discarded; the app trusts X-Forwarded-For only from this proxy's network.
+		header_up X-Forwarded-For {remote_host}
+		header_up -X-Forwarded-Host
+		header_up -Forwarded
+		header_up -X-Real-IP
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 60s
+		}
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				request>headers>X-Csrf-Token delete
+				request>headers>X-Api-Key delete
+				resp_headers>Set-Cookie delete
+				request>uri query {
+					delete token
+					delete key
+					delete code
+					delete state
+				}
+			}
+		}
+	}
+}
+
+# Explicit hosts (Gate 2/3): certificates are obtained at start-up.
+desk.{$BASE_DOMAIN}, demo.{$BASE_DOMAIN} {
+	import agentdesk
+}
+
+# Generated tenant agents: direct children of BASE_DOMAIN only, certificate on demand after the app's "ask" check.
+*.{$BASE_DOMAIN} {
+	tls {
+		on_demand
+	}
+	import agentdesk
+}
+
+# Anything else (bare IP, unknown names) gets nothing.
+:443 {
+	tls internal
+	respond 421
+}

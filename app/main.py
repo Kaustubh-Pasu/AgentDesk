@@ -227,7 +227,13 @@ def build_app(settings: Settings | None = None, overrides: Overrides | None = No
     app = FastAPI(title="Agent Desk", docs_url=None, redoc_url=None, openapi_url=None, debug=False, lifespan=lifespan)
     app.state.services = services
     app.router.redirect_slashes = False  # no implicit redirects: unknown paths are plain 404s
-    app.router.routes.extend([Route("/healthz", _healthz), *create_a2a_routes(services.runtime, settings), *services.mcp.routes()])
+    async def tls_ask(request: Any) -> JSONResponse:
+        """Caddy on-demand-TLS gate: a certificate may be requested ONLY for a host we actually serve.
+        Caddy answers 404 for /internal/* on the public side; this is reached over the private network."""
+        served = await services.registry.resolve(request.query_params.get("domain", ""))
+        return JSONResponse({"served": served is not None}, 200 if served is not None else 404)
+
+    app.router.routes.extend([Route("/healthz", _healthz), Route("/internal/tls-ask", tls_ask), *create_a2a_routes(services.runtime, settings), *services.mcp.routes()])
     register_web(app, services)
     return _wrap(app, settings, services.limiter, browser=True), services
 

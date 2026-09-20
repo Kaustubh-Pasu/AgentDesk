@@ -1,0 +1,12 @@
+.git
+.venv
+.env
+.env.*
+secrets
+artifacts
+var
+tests
+docs
+**/__pycache__
+*.db
+*.pem
