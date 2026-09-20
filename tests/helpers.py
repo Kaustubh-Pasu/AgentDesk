@@ -8,12 +8,13 @@ it behaves exactly like the production ``GlobalOnlyPolicy`` except for ONE exact
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import gzip
 import ipaddress
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 
-from app.security.ssrf import GlobalOnlyPolicy, IPAddress, UrlPolicy
+from app.security.ssrf import GlobalOnlyPolicy, IPAddress, SafeClientConfig, UrlPolicy
 
 
 class LoopbackTestPolicy(GlobalOnlyPolicy):
@@ -132,3 +133,36 @@ class TinyServer:
 
 def gzip_bomb(decompressed_size: int) -> bytes:
     return gzip.compress(b"\0" * decompressed_size, compresslevel=9)
+
+
+@contextlib.asynccontextmanager
+async def serve_app(app: object) -> AsyncIterator[int]:
+    """Run an ASGI app on a real loopback socket (uvicorn) so OUR outbound clients can be tested end-to-end."""
+    import uvicorn
+
+    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off")  # type: ignore[arg-type]
+    server = uvicorn.Server(config)
+    task = asyncio.create_task(server.serve())
+    try:
+        for _ in range(500):
+            if server.started:
+                break
+            await asyncio.sleep(0.01)
+        assert server.started, "test server did not start"
+        yield server.servers[0].sockets[0].getsockname()[1]
+    finally:
+        server.should_exit = True
+        await task
+
+
+def loopback_client_config(port: int, hosts: list[str]) -> SafeClientConfig:
+    """SafeClientConfig that reaches ONLY 127.0.0.1:<port> for the given fixture hostnames (plain http)."""
+    return SafeClientConfig(
+        url_policy=UrlPolicy(
+            allowed_schemes=frozenset({"http"}),
+            allowed_ports=frozenset({port}),
+            exempt_hosts=frozenset(hosts),
+        ),
+        address_policy=LoopbackTestPolicy(port),
+        resolver=FakeResolver({h: ["127.0.0.1"] for h in hosts}),
+    )

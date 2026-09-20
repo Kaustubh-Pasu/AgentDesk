@@ -9,7 +9,7 @@ _Last updated: 2026-09-19 (build in progress — see "Build log" at the bottom).
 
 | # | Gate | Live status | Local status | Blocking dependency |
 |---|------|-------------|--------------|---------------------|
-| 1 | Reachable agent endpoint (A2A + MCP) for Agent Desk **and** one generated business agent | `NOT_STARTED` | in progress | public host (Gate 2/3) |
+| 1 | Reachable agent endpoint (A2A + MCP) for Agent Desk **and** one generated business agent | `NOT_STARTED` | `LOCAL_READY` (protocol tests pass in-process and over a loopback socket) | public host (Gate 2/3) |
 | 2 | Public HTTPS URL | `WAITING_FOR_EXTERNAL_INPUT` | not started | a public VPS/host + DNS A records |
 | 3 | Owned MLH domain | `WAITING_FOR_EXTERNAL_INPUT` | not started | `BASE_DOMAIN` value (your MLH domain) |
 | 4 | Production GoDaddy credential + `gddy` CLI flow → ANS status `ACTIVE` | `WAITING_FOR_EXTERNAL_INPUT` | not started | production PAT / event credential, DNS control |
@@ -31,3 +31,7 @@ records the command, timestamp, and redacted output._
 
 - 2026-09-19 — Core security layer (settings, redaction/logging, DB models, schemas, SSRF policy + DNS-pinned
   transport, sessions, CSRF, headers, rate limiting, idempotency, tokens, state handles): 243 local tests pass.
+- 2026-09-19 — Gate 1 local: generic multi-tenant runtime (Host → tenant from DB, deterministic answers with
+  `LLM_PROVIDER=none`), A2A server on a2a-sdk 1.1.4 (Agent Card at `/.well-known/agent-card.json`, JSON-RPC at `/a2a`,
+  1.0 + 0.3 compat), MCP Streamable HTTP on mcp 2.2.0 (`/mcp`, read-only tools), outbound A2A/MCP clients on the
+  pinned SSRF transport, seeded demo agent. 307 local tests pass. Nothing live observed yet.
